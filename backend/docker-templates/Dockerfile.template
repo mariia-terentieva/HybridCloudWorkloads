@@ -1,0 +1,18 @@
+# Auto-generated Dockerfile for workload deployment
+FROM {image}
+
+# Install dependencies if needed
+# RUN apt-get update && apt-get install -y ...
+
+# Copy application files (if provided)
+# COPY app/ /app
+# WORKDIR /app
+
+# Expose port
+EXPOSE {port}
+
+# Set environment variables
+{environment_variables}
+
+# Default command (can be overridden)
+CMD ["{default_command}"]
