@@ -2,7 +2,7 @@ export interface DockerImage {
   value: string;
   label: string;
   port: number;
-  envVars: Array<{ key: string; value: string }>;
+  envVars: Array<{ key: string; value: string; description?: string }>; 
   isWebService: boolean;
   description?: string;
 }
@@ -55,22 +55,34 @@ export const predefinedImages: DockerImage[] = [
     isWebService: false,
     description: 'Популярная реляционная база данных'
   },
-  { 
-    value: 'node:18-alpine', 
-    label: 'Node.js Application', 
-    port: 3000,
-    envVars: [],
-    isWebService: true,
-    description: 'Среда выполнения JavaScript'
-  },
-  { 
-    value: 'python:3.11-slim', 
-    label: 'Python Application', 
-    port: 5000,
-    envVars: [],
-    isWebService: true,
-    description: 'Среда выполнения Python'
-  },
+{ 
+  value: 'node:18-alpine', 
+  label: 'Node.js Application', 
+  port: 3000,
+  envVars: [
+    { 
+      key: 'START_COMMAND', 
+      value: 'npx serve -s . -l 3000',
+      description: 'Команда для запуска Node.js приложения'
+    }
+  ],
+  isWebService: true,
+  description: 'Node.js с веб-сервером'
+},
+{ 
+  value: 'python:3.11-slim', 
+  label: 'Python HTTP Server', 
+  port: 5000,
+  envVars: [
+    { 
+      key: 'START_COMMAND', 
+      value: 'python -m http.server 5000',
+      description: 'Команда для запуска Python HTTP сервера'
+    }
+  ],
+  isWebService: true,
+  description: 'Python с HTTP сервером'
+},
   { 
     value: 'httpd:alpine', 
     label: 'Apache HTTP Server', 
@@ -90,14 +102,14 @@ export const predefinedImages: DockerImage[] = [
     isWebService: false,
     description: 'Документо-ориентированная база данных'
   },
-  { 
-    value: '', 
-    label: 'Custom Image', 
-    port: 80,
-    envVars: [],
-    isWebService: true,
-    description: 'Пользовательский Docker образ'
-  },
+{ 
+  value: '', 
+  label: 'Custom Image...',
+  port: 80,
+  envVars: [], // Пустой массив - пользователь сам добавит нужные переменные
+  isWebService: true,
+  description: 'Введите свой Docker образ'
+},
 ];
 
 // Функции для работы с образами

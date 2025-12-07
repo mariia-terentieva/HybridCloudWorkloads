@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("HybridCloudWorkloads.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+39fefb01494b3f0041e370950dcc0a0a009d9796")]
 [assembly: System.Reflection.AssemblyProductAttribute("HybridCloudWorkloads.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HybridCloudWorkloads.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

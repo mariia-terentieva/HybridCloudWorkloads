@@ -32,3 +32,4 @@ D:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.Infrastructure\obj\Debu
 D:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.Infrastructure\obj\Debug\net8.0\HybridCloudWorkloads.Infrastructure.pdb
 D:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.Infrastructure\obj\Debug\net8.0\HybridCloudWorkloads.Infrastructure.genruntimeconfig.cache
 D:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.Infrastructure\obj\Debug\net8.0\ref\HybridCloudWorkloads.Infrastructure.dll
+C:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.Infrastructure\obj\Debug\net8.0\HybridCloudWorkloads.Infrastructure.sourcelink.json

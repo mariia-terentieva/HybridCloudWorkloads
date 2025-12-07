@@ -258,3 +258,4 @@ D:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.API\obj\Debug\net8.0\re
 D:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.API\obj\Debug\net8.0\HybridCloudWorkloads.API.pdb
 D:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.API\obj\Debug\net8.0\HybridCloudWorkloads.API.genruntimeconfig.cache
 D:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.API\obj\Debug\net8.0\ref\HybridCloudWorkloads.API.dll
+C:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.API\obj\Debug\net8.0\HybridCloudWorkloads.API.sourcelink.json

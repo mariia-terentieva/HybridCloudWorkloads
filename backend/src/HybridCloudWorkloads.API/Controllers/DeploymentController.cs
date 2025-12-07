@@ -109,6 +109,42 @@ public async Task<ActionResult<DeploymentResponse>> DeployWorkload(Guid workload
     }
 }
 
+private string GetContainerCommand(string? containerImage, string? environmentVariables)
+{
+    if (string.IsNullOrEmpty(containerImage))
+        return string.Empty;
+    
+    // Попробуем извлечь START_COMMAND из переменных окружения
+    if (!string.IsNullOrEmpty(environmentVariables))
+    {
+        try
+        {
+            var envDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(
+                environmentVariables);
+            
+            if (envDict != null && envDict.TryGetValue("START_COMMAND", out var startCommand))
+            {
+                return startCommand;
+            }
+        }
+        catch
+        {
+            // Игнорируем ошибки парсинга
+        }
+    }
+    
+    // Команды по умолчанию для образов
+    var defaultCommands = new Dictionary<string, string>
+    {
+        { "node:18-alpine", "npx serve -s . -l 3000" },
+        { "node:latest", "npx serve -s . -l 3000" },
+        { "python:3.11-slim", "python -m http.server 5000" },
+        { "python:latest", "python -m http.server 5000" },
+    };
+    
+    return defaultCommands.TryGetValue(containerImage, out var command) ? command : string.Empty;
+}
+
 private async Task<(string AccessUrl, string ContainerId)> DeployContainerAndGetId(Workload workload)
 {
     try
@@ -116,7 +152,10 @@ private async Task<(string AccessUrl, string ContainerId)> DeployContainerAndGet
         var containerName = $"workload-{workload.Id.ToString().Substring(0, 8)}";
         var hostPort = GetAvailablePort();
         
-        // ПОДГОТОВКА ПЕРЕМЕННЫХ ОКРУЖЕНИЯ
+        // ВЫЗЫВАЕМ ФУНКЦИЮ ДЛЯ ПОЛУЧЕНИЯ КОМАНДЫ
+        string command = GetContainerCommand(workload.ContainerImage, workload.EnvironmentVariables);
+        
+        // Подготовка переменных окружения
         var envVars = new StringBuilder();
         
         if (!string.IsNullOrEmpty(workload.EnvironmentVariables))
@@ -132,7 +171,11 @@ private async Task<(string AccessUrl, string ContainerId)> DeployContainerAndGet
                     {
                         if (!string.IsNullOrEmpty(kvp.Key) && !string.IsNullOrEmpty(kvp.Value))
                         {
-                            envVars.Append($" -e {kvp.Key}=\"{kvp.Value}\"");
+                            // ИСКЛЮЧАЕМ START_COMMAND ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ DOCKER
+                            if (kvp.Key != "START_COMMAND")
+                            {
+                                envVars.Append($" -e {kvp.Key}=\"{kvp.Value}\"");
+                            }
                         }
                     }
                 }
@@ -143,6 +186,27 @@ private async Task<(string AccessUrl, string ContainerId)> DeployContainerAndGet
                     workload.Id);
             }
         }
+
+        // ФОРМИРУЕМ КОМАНДУ DOCKER С УЧЕТОМ command
+        var dockerArgsBuilder = new StringBuilder();
+        dockerArgsBuilder.Append($"run -d --name {containerName} -p {hostPort}:{workload.ExposedPort}");
+        
+        // Добавляем переменные окружения, если есть
+        if (envVars.Length > 0)
+        {
+            dockerArgsBuilder.Append(envVars.ToString());
+        }
+        
+        // Добавляем образ
+        dockerArgsBuilder.Append($" {workload.ContainerImage ?? "nginx:alpine"}");
+        
+        // ДОБАВЛЯЕМ КОМАНДУ ЗАПУСКА, ЕСЛИ ОНА ЕСТЬ
+        if (!string.IsNullOrEmpty(command))
+        {
+            dockerArgsBuilder.Append($" {command}");
+        }
+        
+        var dockerArgs = dockerArgsBuilder.ToString();
         
         // Запускаем контейнер через Process
         var process = new Process
@@ -150,9 +214,7 @@ private async Task<(string AccessUrl, string ContainerId)> DeployContainerAndGet
             StartInfo = new ProcessStartInfo
             {
                 FileName = "docker",
-                Arguments = $"run -d --name {containerName} -p {hostPort}:{workload.ExposedPort} " +
-                           $"{envVars} " + // ДОБАВЛЯЕМ ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ
-                           $"{workload.ContainerImage ?? "nginx:alpine"}",
+                Arguments = dockerArgs,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -162,6 +224,7 @@ private async Task<(string AccessUrl, string ContainerId)> DeployContainerAndGet
 
         _logger.LogInformation("Starting Docker container with command: docker {Args}", 
             process.StartInfo.Arguments);
+        _logger.LogInformation("Container command: {Command}", command);
 
         process.Start();
         var containerId = (await process.StandardOutput.ReadToEndAsync()).Trim();

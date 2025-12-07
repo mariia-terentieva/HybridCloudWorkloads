@@ -20,3 +20,4 @@ D:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.Core\obj\Debug\net8.0\H
 D:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.Core\obj\Debug\net8.0\refint\HybridCloudWorkloads.Core.dll
 D:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.Core\obj\Debug\net8.0\HybridCloudWorkloads.Core.pdb
 D:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.Core\obj\Debug\net8.0\ref\HybridCloudWorkloads.Core.dll
+C:\HybridCloudWorkloads\backend\src\HybridCloudWorkloads.Core\obj\Debug\net8.0\HybridCloudWorkloads.Core.sourcelink.json

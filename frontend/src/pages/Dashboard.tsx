@@ -296,7 +296,7 @@ export const Dashboard: React.FC = () => {
                           <Box display="flex" gap={1} mt={1}>
                             <Chip
                               size="small"
-                              label={`${workload.type}`}
+                              label={`${getTypeLabel(workload.type)}`}
                               color={getWorkloadTypeColor(workload.type) as any}
                               variant="outlined"
                             />
