@@ -148,115 +148,120 @@ export const Dashboard: React.FC = () => {
       </Paper>
 
       <Grid container spacing={3}>
-        {/* Quick Stats */}
-        <Grid item xs={12}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                      <Typography color="text.secondary" gutterBottom>
-                        Всего нагрузок
-                      </Typography>
-                      <Typography variant="h4">
-                        {stats?.totalWorkloads || 0}
-                      </Typography>
-                    </Box>
-                    <Computer sx={{ fontSize: 40, color: 'primary.main' }} />
-                  </Box>
-                  {isLoading && <LinearProgress sx={{ mt: 1 }} />}
-                </CardContent>
-              </Card>
-            </Grid>
+{/* Quick Stats */}
+<Grid item xs={12}>
+  <Box
+    display="flex"
+    flexWrap="wrap"
+    gap={3}
+    sx={{
+      '& > .MuiPaper-root': {
+        flex: '1 1 200px', // Карточки будут минимум 200px, переносятся при нехватке места
+        minWidth: '200px',
+        maxWidth: '100%',
+      },
+    }}
+  >
+    {/* Карточка 1: Всего нагрузок */}
+    <Card>
+      <CardContent>
+        <Box display="flex" alignItems="center" justifyContent="space-between">
+          <Box>
+            <Typography color="text.secondary" gutterBottom>
+              Всего нагрузок
+            </Typography>
+            <Typography variant="h4">
+              {stats?.totalWorkloads || 0}
+            </Typography>
+          </Box>
+          <Computer sx={{ fontSize: 40, color: 'primary.main' }} />
+        </Box>
+        {isLoading && <LinearProgress sx={{ mt: 1 }} />}
+      </CardContent>
+    </Card>
 
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                      <Typography color="text.secondary" gutterBottom>
-                        Всего ядер CPU
-                      </Typography>
-                      <Typography variant="h4">
-                        {stats?.totalCpu || 0}
-                      </Typography>
-                    </Box>
-                    <TrendingUp sx={{ fontSize: 40, color: 'success.main' }} />
-                  </Box>
-                  {isLoading && <LinearProgress sx={{ mt: 1 }} />}
-                </CardContent>
-              </Card>
-            </Grid>
+    {/* Карточка 2: Всего ядер CPU */}
+    <Card>
+      <CardContent>
+        <Box display="flex" alignItems="center" justifyContent="space-between">
+          <Box>
+            <Typography color="text.secondary" gutterBottom>
+              Всего ядер CPU
+            </Typography>
+            <Typography variant="h4">
+              {stats?.totalCpu || 0}
+            </Typography>
+          </Box>
+          <TrendingUp sx={{ fontSize: 40, color: 'success.main' }} />
+        </Box>
+        {isLoading && <LinearProgress sx={{ mt: 1 }} />}
+      </CardContent>
+    </Card>
 
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                      <Typography color="text.secondary" gutterBottom>
-                        Всего ОЗУ (ГБ)
-                      </Typography>
-                      <Typography variant="h4">
-                        {stats?.totalMemory?.toFixed(1) || 0}
-                      </Typography>
-                    </Box>
-                    <Memory sx={{ fontSize: 40, color: 'info.main' }} />
-                  </Box>
-                  {isLoading && <LinearProgress sx={{ mt: 1 }} />}
-                </CardContent>
-              </Card>
-            </Grid>
+    {/* Карточка 3: Всего ОЗУ (ГБ) */}
+    <Card>
+      <CardContent>
+        <Box display="flex" alignItems="center" justifyContent="space-between">
+          <Box>
+            <Typography color="text.secondary" gutterBottom>
+              Всего ОЗУ (ГБ)
+            </Typography>
+            <Typography variant="h4">
+              {stats?.totalMemory?.toFixed(1) || 0}
+            </Typography>
+          </Box>
+          <Memory sx={{ fontSize: 40, color: 'info.main' }} />
+        </Box>
+        {isLoading && <LinearProgress sx={{ mt: 1 }} />}
+      </CardContent>
+    </Card>
 
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                      <Typography color="text.secondary" gutterBottom>
-                        Всего хранилища (ГБ)
-                      </Typography>
-                      <Typography variant="h4">
-                        {stats?.totalStorage?.toFixed(1) || 0}
-                      </Typography>
-                    </Box>
-                    <Storage sx={{ fontSize: 40, color: 'warning.main' }} />
-                  </Box>
-                  {isLoading && <LinearProgress sx={{ mt: 1 }} />}
-                </CardContent>
-              </Card>
-            </Grid>
+    {/* Карточка 4: Всего хранилища (ГБ) */}
+    <Card>
+      <CardContent>
+        <Box display="flex" alignItems="center" justifyContent="space-between">
+          <Box>
+            <Typography color="text.secondary" gutterBottom>
+              Всего хранилища (ГБ)
+            </Typography>
+            <Typography variant="h4">
+              {stats?.totalStorage?.toFixed(1) || 0}
+            </Typography>
+          </Box>
+          <Storage sx={{ fontSize: 40, color: 'warning.main' }} />
+        </Box>
+        {isLoading && <LinearProgress sx={{ mt: 1 }} />}
+      </CardContent>
+    </Card>
 
-            {/* Карточка Active Deployments */}
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                      <Typography color="text.secondary" gutterBottom>
-                        Активные развертывания
-                      </Typography>
-                      <Typography variant="h4">
-                        {runningDeployments.length || 0}
-                      </Typography>
-                    </Box>
-                    <Cloud sx={{ fontSize: 40, color: 'info.main' }} />
-                  </Box>
-                  {isLoading && <LinearProgress sx={{ mt: 1 }} />}
-                </CardContent>
-                <CardActions>
-                  <Button 
-                    size="small" 
-                    onClick={() => navigate('/deployments')}
-                    startIcon={<ArrowForward />}
-                  >
-                    Посмотреть развертывания
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          </Grid>
-        </Grid>
+    {/* Карточка 5: Активные развертывания */}
+    <Card>
+      <CardContent>
+        <Box display="flex" alignItems="center" justifyContent="space-between">
+          <Box>
+            <Typography color="text.secondary" gutterBottom>
+              Активные развертывания
+            </Typography>
+            <Typography variant="h4">
+              {runningDeployments.length || 0}
+            </Typography>
+          </Box>
+          <Cloud sx={{ fontSize: 40, color: 'info.main' }} />
+        </Box>
+        {isLoading && <LinearProgress sx={{ mt: 1 }} />}
+      </CardContent>
+      <CardActions>
+        <Button
+          size="small"
+          onClick={() => navigate('/deployments')}
+          startIcon={<ArrowForward />}
+        >
+          Посмотреть развертывания
+        </Button>
+      </CardActions>
+    </Card>
+  </Box>
+</Grid>
 
         {/* Main Content */}
         <Grid item xs={12} md={8}>
@@ -397,12 +402,12 @@ export const Dashboard: React.FC = () => {
                       </ListItemIcon>
                       <ListItemText primary="Настройки профиля" />
                     </ListItem>
-                    <ListItem button>
+                   {/* <ListItem button>
                       <ListItemIcon>
                         <Security color="action" />
                       </ListItemIcon>
                       <ListItemText primary="Настройки безопасности" />
-                    </ListItem>
+                    </ListItem> */}
                   </List>
                 </CardContent>
               </Card>
@@ -498,11 +503,11 @@ export const Dashboard: React.FC = () => {
                     </Box>
                   </Box>
                 </CardContent>
-                <CardActions>
+                {/* <CardActions>
                   <Button size="small" startIcon={<Settings />}>
                     Настройки системы
                   </Button>
-                </CardActions>
+                </CardActions> */}
               </Card>
             </Grid>
           </Grid>
