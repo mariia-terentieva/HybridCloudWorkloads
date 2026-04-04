@@ -10,6 +10,10 @@ import {
   Chip,
   Alert,
   Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { 
   Add, 
@@ -22,9 +26,11 @@ import {
   Link,
   ArrowBack,
   Replay,
+  ShowChart,
 } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { MetricsDashboard } from '../components/MetricsDashboard';
 import { WorkloadForm } from '../components/WorkloadForm';
 import { workloadService } from '../services/workloadService';
 import { Workload, CreateWorkloadRequest, UpdateWorkloadRequest } from '../types';
@@ -37,6 +43,8 @@ export const Workloads: React.FC = () => {
   const [formOpen, setFormOpen] = React.useState(false);
   const [editingWorkload, setEditingWorkload] = React.useState<Workload | null>(null);
   const [deployMessage, setDeployMessage] = React.useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [metricsDialogOpen, setMetricsDialogOpen] = React.useState(false);
+  const [selectedWorkloadForMetrics, setSelectedWorkloadForMetrics] = React.useState<Workload | null>(null);
 
   const { data: workloads, isLoading } = useQuery({
     queryKey: ['workloads', search],
@@ -110,6 +118,11 @@ export const Workloads: React.FC = () => {
     if (editingWorkload) {
       updateMutation.mutate({ id: editingWorkload.id, data });
     }
+  };
+
+  const handleShowMetrics = (workload: Workload) => {
+    setSelectedWorkloadForMetrics(workload);
+    setMetricsDialogOpen(true);
   };
 
   const handleRedeploy = (id: string) => {
@@ -239,6 +252,12 @@ export const Workloads: React.FC = () => {
               setEditingWorkload(params.row);
               setFormOpen(true);
             }}
+          />,
+          <GridActionsCellItem
+            icon={<ShowChart />}
+            label="Метрики"
+            onClick={() => handleShowMetrics(params.row)}
+            showInMenu
           />,
           <GridActionsCellItem
             icon={<Delete />}
@@ -413,6 +432,30 @@ export const Workloads: React.FC = () => {
         }}
         onSubmit={editingWorkload ? handleUpdate : handleCreate}
       />
+
+<Dialog
+  open={metricsDialogOpen}
+  onClose={() => setMetricsDialogOpen(false)}
+  maxWidth="lg"
+  fullWidth
+>
+  <DialogTitle>
+    Метрики производительности
+  </DialogTitle>
+  <DialogContent dividers>
+    {selectedWorkloadForMetrics && (
+      <MetricsDashboard
+        workloadId={selectedWorkloadForMetrics.id}
+        workloadName={selectedWorkloadForMetrics.name}
+      />
+    )}
+  </DialogContent>
+  <DialogActions>
+    <Button onClick={() => setMetricsDialogOpen(false)}>
+      Закрыть
+    </Button>
+  </DialogActions>
+</Dialog>
     </Container>
   );
 };

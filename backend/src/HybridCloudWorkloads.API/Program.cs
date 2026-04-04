@@ -2,17 +2,29 @@ using HybridCloudWorkloads.Core.Entities;
 using HybridCloudWorkloads.Infrastructure.Data;
 using HybridCloudWorkloads.Infrastructure.Entities;
 using HybridCloudWorkloads.Infrastructure.Services;
+using HybridCloudWorkloads.Core.Interfaces; // ДОБАВЛЕНО для IPerformanceMetricsRepository
+using HybridCloudWorkloads.Infrastructure.Repositories; // ДОБАВЛЕНО для PerformanceMetricsRepository
+using HybridCloudWorkloads.API.Services; // ДОБАВЛЕНО для MetricsCleanupService
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    });
 //
 builder.Services.AddScoped<DockerService>();
 //
@@ -48,7 +60,8 @@ builder.Services.AddSwaggerGen(c =>
 
 // Database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
+        x => x.MigrationsAssembly("HybridCloudWorkloads.Infrastructure")));
 
 // Identity
 builder.Services.AddIdentity<User, IdentityRole<Guid>>(options =>
@@ -95,6 +108,12 @@ builder.Services.AddCors(options =>
               .AllowCredentials();
     });
 });
+
+// Регистрация репозиториев и сервисов
+builder.Services.AddScoped<IPerformanceMetricsRepository, PerformanceMetricsRepository>();
+builder.Services.AddHostedService<MetricsCleanupService>();
+// Фоновый сервис для сбора метрик
+builder.Services.AddHostedService<MetricsCollectorService>();
 
 var app = builder.Build();
 

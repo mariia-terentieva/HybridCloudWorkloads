@@ -14,10 +14,39 @@ import {
   Typography,
   Tooltip,
   InputAdornment,
+  FormControl,
+  InputLabel,
+  Select,
+  Chip,
+  FormHelperText,
+  Divider,
+  Paper,
 } from '@mui/material';
-import { Info, Add, Remove, Terminal, ArrowBack } from '@mui/icons-material';
-import { useForm, Controller, useFieldArray, SubmitHandler } from 'react-hook-form';
-import { Workload, CreateWorkloadRequest, UpdateWorkloadRequest } from '../types';
+import {
+  Info,
+  Add,
+  Remove,
+  Terminal,
+  ArrowBack,
+  Speed,
+  BusinessCenter,
+  AttachMoney,
+  AccessTime,
+  Warning,
+  CheckCircle,
+} from '@mui/icons-material';
+import { useForm, Controller, useFieldArray } from 'react-hook-form';
+import { 
+  Workload, 
+  CreateWorkloadRequest, 
+  UpdateWorkloadRequest,
+  UsagePattern,
+  CriticalityClass,
+  BudgetTier,
+  SlaRequirement,
+  BusinessHours,
+  TimeRange,
+} from '../types';
 import { predefinedImages, getImageInfo } from '../utils/dockerImages';
 
 // Интерфейс для переменных окружения
@@ -26,7 +55,7 @@ interface EnvironmentVariable {
   value: string;
 }
 
-// Интерфейс данных формы
+// Интерфейс данных формы с новыми полями классификации
 interface WorkloadFormData {
   name: string;
   description?: string;
@@ -37,6 +66,31 @@ interface WorkloadFormData {
   containerImage?: string;
   exposedPort?: number;
   environmentVars: EnvironmentVariable[];
+  
+  // НОВЫЕ ПОЛЯ КЛАССИФИКАЦИИ
+  usagePattern: UsagePattern;
+  criticality: CriticalityClass;
+  budgetTier: BudgetTier;
+  
+  // SLA требования
+  slaRequirements: {
+    maxResponseTimeMs: number;
+    allowedDowntimePerMonth: number;
+    availabilityTarget: number;
+    requiresRedundancy: boolean;
+    minReplicas: number;
+    maxRecoveryTimeMinutes: number;
+  };
+  
+  // Бизнес-часы
+  businessHours: {
+    timezone: string;
+    peakHours: TimeRange[];
+    weekendLoadPercent: number;
+    workingDays: number[];
+  };
+  
+  tags: string;
 }
 
 interface WorkloadFormProps {
@@ -46,12 +100,51 @@ interface WorkloadFormProps {
   onSubmit: (data: CreateWorkloadRequest | UpdateWorkloadRequest) => void;
 }
 
+// Опции для выпадающих списков
 const workloadTypes = [
   { value: 'VirtualMachine', label: 'Виртуальная машина' },
   { value: 'Database', label: 'База данных' },
   { value: 'WebService', label: 'Веб-сервис' },
   { value: 'Container', label: 'Контейнер' },
   { value: 'BatchJob', label: 'Пакетное задание' },
+];
+
+const usagePatternOptions = [
+  { value: 'Constant', label: 'Постоянная', description: 'Нагрузка 24/7 без значительных колебаний', icon: '🔄' },
+  { value: 'Periodic', label: 'Периодическая', description: 'Нагрузка изменяется по предсказуемому расписанию', icon: '📅' },
+  { value: 'Burst', label: 'Пиковая', description: 'Кратковременные пиковые нагрузки', icon: '⚡' },
+  { value: 'Unpredictable', label: 'Непредсказуемая', description: 'Случайные всплески нагрузки', icon: '🎲' },
+];
+
+const criticalityOptions = [
+  { value: 'MissionCritical', label: 'Критическая', description: 'Критически важные для бизнеса системы, простой недопустим', icon: '🔴', color: 'error' },
+  { value: 'BusinessEssential', label: 'Важная', description: 'Важные системы, допустимы кратковременные перерывы', icon: '🟠', color: 'warning' },
+  { value: 'NonCritical', label: 'Некритичная', description: 'Некритичные нагрузки, тестовые среды', icon: '🟢', color: 'success' },
+];
+
+const budgetTierOptions = [
+  { value: 'High', label: 'Высокий', description: 'Приоритет производительности, стоимость вторична', icon: '💰' },
+  { value: 'Medium', label: 'Средний', description: 'Баланс стоимости и производительности', icon: '⚖️' },
+  { value: 'Low', label: 'Низкий', description: 'Приоритет экономии, допустимо снижение производительности', icon: '📉' },
+];
+
+const timezoneOptions = [
+  'UTC',
+  'Europe/Moscow',
+  'Europe/London',
+  'America/New_York',
+  'Asia/Singapore',
+  'Asia/Tokyo',
+];
+
+const weekDays = [
+  { value: 1, label: 'Пн' },
+  { value: 2, label: 'Вт' },
+  { value: 3, label: 'Ср' },
+  { value: 4, label: 'Чт' },
+  { value: 5, label: 'Пт' },
+  { value: 6, label: 'Сб' },
+  { value: 7, label: 'Вс' },
 ];
 
 export const WorkloadForm: React.FC<WorkloadFormProps> = ({
@@ -66,152 +159,153 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
     reset,
     watch,
     setValue,
+    getValues,
     formState: { errors },
   } = useForm<WorkloadFormData>({
     defaultValues: {
-      name: workload?.name || '',
-      description: workload?.description || '',
-      type: workload?.type || 'VirtualMachine',
-      requiredCpu: workload?.requiredCpu || 1,
-      requiredMemory: workload?.requiredMemory || 1,
-      requiredStorage: workload?.requiredStorage || 10,
-      containerImage: workload?.containerImage || 'nginx:latest',
-      exposedPort: workload?.exposedPort || 80,
+      name: '',
+      description: '',
+      type: 'VirtualMachine',
+      requiredCpu: 1,
+      requiredMemory: 1,
+      requiredStorage: 10,
+      containerImage: 'nginx:latest',
+      exposedPort: 80,
       environmentVars: [{ key: '', value: '' }],
+      
+      // НОВЫЕ ПОЛЯ - значения по умолчанию
+      usagePattern: 'Constant',
+      criticality: 'NonCritical',
+      budgetTier: 'Medium',
+      
+      slaRequirements: {
+        maxResponseTimeMs: 1000,
+        allowedDowntimePerMonth: 60,
+        availabilityTarget: 99.9,
+        requiresRedundancy: false,
+        minReplicas: 1,
+        maxRecoveryTimeMinutes: 60,
+      },
+      
+      businessHours: {
+        timezone: 'UTC',
+        peakHours: [{ start: '09:00', end: '18:00' }],
+        weekendLoadPercent: 30,
+        workingDays: [1, 2, 3, 4, 5],
+      },
+      
+      tags: '',
     },
   });
 
   const [inputMode, setInputMode] = React.useState<'select' | 'custom'>('select');
+  const [showSlaDetails, setShowSlaDetails] = React.useState(false);
+  const [showBusinessHours, setShowBusinessHours] = React.useState(false);
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields: envFields, append: appendEnv, remove: removeEnv } = useFieldArray({
     control,
     name: 'environmentVars',
   });
 
-// Функция для проверки, является ли переменная обязательной или зарезервированной
-const isReservedEnvVar = (key: string, imageName: string): { isRequired: boolean; isReserved: boolean } => {
-  const image = getImageInfo(imageName);
-  
-  // Определяем обязательные переменные для каждого типа БД
-  const requiredVars: Record<string, string[]> = {
-    'postgres': ['POSTGRES_PASSWORD', 'POSTGRES_DB', 'POSTGRES_USER'],
-    'mysql': ['MYSQL_ROOT_PASSWORD', 'MYSQL_DATABASE'],
-    'mongo': ['MONGO_INITDB_ROOT_USERNAME', 'MONGO_INITDB_ROOT_PASSWORD'],
-  };
-  
-  // Для предопределенных образов
-  if (image) {
-    // Находим тип базы данных
-    const dbType = Object.keys(requiredVars).find(type => 
-      imageName.toLowerCase().includes(type)
-    );
-    
-    const isRequired = dbType ? requiredVars[dbType].includes(key) : false;
-    
-    // Для предопределенных образов, START_COMMAND всегда зарезервирована
-    const isReserved = key === 'START_COMMAND';
-    
-    return { isRequired, isReserved };
-  }
-  
-  // Для custom image: START_COMMAND не является обязательной или зарезервированной
-  // Пользователь может изменить ключ или удалить ее
-  return { isRequired: false, isReserved: false };
-};
-
-// Обработчик изменения образа
-const handleImageChange = (newImage: string) => {
-  const selectedImage = getImageInfo(newImage);
-  
-  // Устанавливаем новое значение образа и порт
-  setValue('containerImage', newImage);
-  setValue('exposedPort', selectedImage?.port || 80);
-  
-  // ОСОБАЯ ЛОГИКА ДЛЯ CUSTOM IMAGE
-  if (newImage === '') {
-    // Для Custom Image: добавляем START_COMMAND как зарезервированную
-    setValue('environmentVars', [{ 
-      key: 'START_COMMAND', 
-      value: ''
-    }]);
-  } 
-  // ДЛЯ ПРЕДОПРЕДЕЛЕННЫХ ОБРАЗОВ - ЗАМЕНЯЕМ ПЕРЕМЕННЫЕ
-  else if (selectedImage?.envVars && selectedImage.envVars.length > 0) {
-    setValue('environmentVars', selectedImage.envVars);
-  } else {
-    setValue('environmentVars', [{ key: '', value: '' }]);
-  }
-};
+  const { fields: peakHoursFields, append: appendPeakHour, remove: removePeakHour } = useFieldArray({
+    control,
+    name: 'businessHours.peakHours',
+  });
 
   const containerImage = watch('containerImage');
+  const criticality = watch('criticality');
+  const budgetTier = watch('budgetTier');
 
-    // Определяем является ли образ custom
+  // Определяем является ли образ custom
   const isCustomImage = React.useMemo(() => {
     if (!containerImage) return false;
-    // Если режим custom, то это точно custom image
     if (inputMode === 'custom') return true;
-    // Иначе проверяем, есть ли в predefinedImages
     return !predefinedImages.some(img => img.value === containerImage);
   }, [containerImage, inputMode]);
 
-React.useEffect(() => {
-  if (containerImage && !workload) {
-    const selectedImage = getImageInfo(containerImage);
-    
-    if (selectedImage) {
-      // Автоматически устанавливаем порт
-      setValue('exposedPort', selectedImage.port);
-      
-      // Автоматически заполняем переменные окружения
-      if (selectedImage.envVars && selectedImage.envVars.length > 0) {
-        const currentVars = watch('environmentVars') || [];
-        const existingKeys = currentVars.map(v => v.key);
-        
-        const newVars = [...currentVars];
-        
-        selectedImage.envVars.forEach(defaultVar => {
-          const existingIndex = existingKeys.indexOf(defaultVar.key);
-          
-          if (existingIndex === -1) {
-            // Добавляем новую переменную
-            newVars.push(defaultVar);
-          } else if (defaultVar.key === 'START_COMMAND') {
-            // ОБНОВЛЯЕМ ЗНАЧЕНИЕ START_COMMAND, НО НЕ ПЕРЕЗАПИСЫВАЕМ ДРУГИЕ
-            newVars[existingIndex] = {
-              ...newVars[existingIndex],
-              value: defaultVar.value
-            };
-          }
-          // Для других переменных сохраняем существующие значения
-        });
-        
-        setValue('environmentVars', newVars);
-      }
-    }
-  }
-}, [containerImage, setValue, workload, watch]);
-
-
-  const showDeploymentFields = containerImage !== undefined && containerImage !== null;
-
   // Функция для парсинга JSON строки в массив объектов
-const parseEnvironmentVariables = (envJson?: string): EnvironmentVariable[] => {
-  if (!envJson) return [];
-  
-  try {
-    const parsed = JSON.parse(envJson);
-    const entries = Object.entries(parsed);
-    
-    return entries.map(([key, value]) => ({
-      key,
-      value: typeof value === 'string' ? value : String(value)
-    }));
-  } catch {
-    return [];
-  }
-};
+  const parseEnvironmentVariables = (envJson?: string): EnvironmentVariable[] => {
+    if (!envJson) return [];
+    try {
+      const parsed = JSON.parse(envJson);
+      return Object.entries(parsed).map(([key, value]) => ({
+        key,
+        value: typeof value === 'string' ? value : String(value)
+      }));
+    } catch {
+      return [];
+    }
+  };
 
-  // Функции для ограничения ввода
+  // Функция для парсинга тегов
+  const parseTags = (tagsString?: string): string[] => {
+    if (!tagsString) return [];
+    return tagsString.split(',').map(t => t.trim()).filter(t => t);
+  };
+
+  // Загрузка данных при редактировании
+  React.useEffect(() => {
+    if (workload) {
+      const environmentVars = parseEnvironmentVariables(workload.environmentVariables);
+      
+      // Парсим SLA требования
+      let slaRequirements = {
+        maxResponseTimeMs: 1000,
+        allowedDowntimePerMonth: 60,
+        availabilityTarget: 99.9,
+        requiresRedundancy: false,
+        minReplicas: 1,
+        maxRecoveryTimeMinutes: 60,
+      };
+      
+      if (workload.slaRequirements) {
+        slaRequirements = { ...slaRequirements, ...workload.slaRequirements };
+      }
+      
+      // Парсим бизнес-часы
+      let businessHours = {
+        timezone: 'UTC',
+        peakHours: [{ start: '09:00', end: '18:00' }],
+        weekendLoadPercent: 30,
+        workingDays: [1, 2, 3, 4, 5],
+      };
+      
+      if (workload.businessHours) {
+        businessHours = { ...businessHours, ...workload.businessHours };
+      }
+      
+      reset({
+        name: workload.name,
+        description: workload.description,
+        type: workload.type,
+        requiredCpu: workload.requiredCpu,
+        requiredMemory: workload.requiredMemory,
+        requiredStorage: workload.requiredStorage,
+        containerImage: workload.containerImage || 'nginx:latest',
+        exposedPort: workload.exposedPort || 80,
+        environmentVars: environmentVars.length > 0 ? environmentVars : [{ key: '', value: '' }],
+        
+        // НОВЫЕ ПОЛЯ
+        usagePattern: workload.usagePattern || 'Constant',
+        criticality: workload.criticality || 'NonCritical',
+        budgetTier: workload.budgetTier || 'Medium',
+        slaRequirements,
+        businessHours,
+        tags: workload.tags?.join(', ') || '',
+      });
+    }
+  }, [workload, reset]);
+
+  // Обработчик изменения образа
+  const handleImageChange = (newImage: string) => {
+    setValue('containerImage', newImage);
+    const selectedImage = getImageInfo(newImage);
+    if (selectedImage?.port) {
+      setValue('exposedPort', selectedImage.port);
+    }
+  };
+
+  // Валидация чисел
   const allowOnlyDigits = (e: React.KeyboardEvent) => {
     if (!/[\d]/.test(e.key) && 
         e.key !== 'Backspace' && 
@@ -223,87 +317,7 @@ const parseEnvironmentVariables = (envJson?: string): EnvironmentVariable[] => {
     }
   };
 
-  const allowDigitsAndDot = (e: React.KeyboardEvent) => {
-    if (!/[\d.]/.test(e.key) && 
-        e.key !== 'Backspace' && 
-        e.key !== 'Tab' && 
-        e.key !== 'Delete' && 
-        e.key !== 'ArrowLeft' && 
-        e.key !== 'ArrowRight') {
-      e.preventDefault();
-    }
-    // Запрет на ввод более одной точки
-    if (e.key === '.' && (e.target as HTMLInputElement).value.includes('.')) {
-      e.preventDefault();
-    }
-  };
-
-// ТОЛЬКО ДЛЯ НАЧАЛЬНОЙ ЗАГРУЗКИ, НЕ ДЛЯ ИЗМЕНЕНИЙ
-React.useEffect(() => {
-  if (workload) {
-    // При редактировании существующей нагрузки
-    const environmentVars = parseEnvironmentVariables(workload.environmentVariables);
-    const image = getImageInfo(workload.containerImage);
-    
-    // Проверяем является ли образ custom
-    const isCustom = workload.containerImage && 
-      !predefinedImages.some(img => img.value === workload.containerImage);
-    
-    reset({
-      name: workload.name,
-      description: workload.description,
-      type: workload.type,
-      requiredCpu: workload.requiredCpu,
-      requiredMemory: workload.requiredMemory,
-      requiredStorage: workload.requiredStorage,
-      containerImage: workload.containerImage || 'nginx:latest',
-      exposedPort: workload.exposedPort || image?.port || 80,
-      environmentVars: environmentVars.length > 0 ? environmentVars : 
-        (isCustom ? [{ key: 'START_COMMAND', value: '' }] : [{ key: '', value: '' }]),
-    });
-  } else {
-    // При создании новой нагрузки
-    reset({
-      name: '',
-      description: '',
-      type: 'VirtualMachine',
-      requiredCpu: 1,
-      requiredMemory: 1,
-      requiredStorage: 10,
-      containerImage: 'nginx:latest', // Стандартный образ по умолчанию
-      exposedPort: 80,
-      environmentVars: [{ key: '', value: '' }],
-    });
-  }
-}, [workload, reset]);
-
-  const onFormSubmit: SubmitHandler<WorkloadFormData> = (data) => {
-    const selectedImage = getImageInfo(data.containerImage);
-    const hasStartCommand = selectedImage?.envVars?.some(v => v.key === 'START_COMMAND');
-    const userHasStartCommand = data.environmentVars.some(v => v.key === 'START_COMMAND');
-
-    if (data.containerImage === '') {
-      alert('Пожалуйста, введите имя кастомного Docker образа');
-      return;
-    }
-  
-    if (data.containerImage && !data.containerImage.includes(':')) {
-      const confirmed = window.confirm(
-        `Образ "${data.containerImage}" не содержит тега (например, :latest).\n` +
-        `Рекомендуется указывать тег для стабильности.\n` +
-        `Продолжить без тега?`
-      );
-    
-      if (!confirmed) {
-        return;
-      }
-    }
-  
-   if (hasStartCommand && !userHasStartCommand) {
-      // ПОКАЗЫВАЕМ ОШИБКУ, ЕСЛИ START_COMMAND ОБЯЗАТЕЛЕН, НО ОТСУТСТВУЕТ
-      alert('Для выбранного образа обязательна переменная START_COMMAND. Пожалуйста, добавьте ее.');
-      return;
-    }
+  const onSubmitForm = (data: WorkloadFormData) => {
     // Преобразуем environmentVars в JSON строку
     const envVars = data.environmentVars.reduce((acc, curr) => {
       if (curr.key && curr.value) {
@@ -311,6 +325,9 @@ React.useEffect(() => {
       }
       return acc;
     }, {} as Record<string, string>);
+
+    // Преобразуем теги
+    const tags = data.tags ? data.tags.split(',').map(t => t.trim()).filter(t => t) : undefined;
 
     const submitData: CreateWorkloadRequest = {
       name: data.name,
@@ -322,6 +339,14 @@ React.useEffect(() => {
       containerImage: data.containerImage || undefined,
       exposedPort: data.exposedPort || 80,
       environmentVariables: Object.keys(envVars).length > 0 ? JSON.stringify(envVars) : undefined,
+      
+      // НОВЫЕ ПОЛЯ
+      usagePattern: data.usagePattern,
+      criticality: data.criticality,
+      budgetTier: data.budgetTier,
+      slaRequirements: data.slaRequirements,
+      businessHours: data.businessHours,
+      tags,
     };
 
     onSubmit(submitData);
@@ -329,14 +354,15 @@ React.useEffect(() => {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth scroll="body">
       <DialogTitle>
         {workload ? 'Редактировать нагрузку' : 'Создать новую нагрузку'}
       </DialogTitle>
-      <form onSubmit={handleSubmit(onFormSubmit)}>
-        <DialogContent>
-          <Grid container spacing={2}>
-            {/* Основная информация */}
+      <form onSubmit={handleSubmit(onSubmitForm)}>
+        <DialogContent dividers>
+          <Grid container spacing={3}>
+            
+            {/* ========== ОСНОВНАЯ ИНФОРМАЦИЯ ========== */}
             <Grid item xs={12}>
               <Typography variant="h6" gutterBottom>
                 Основная информация
@@ -355,6 +381,7 @@ React.useEffect(() => {
                     error={!!errors.name}
                     helperText={errors.name?.message}
                     fullWidth
+                    required
                   />
                 )}
               />
@@ -373,6 +400,7 @@ React.useEffect(() => {
                     error={!!errors.type}
                     helperText={errors.type?.message}
                     fullWidth
+                    required
                   >
                     {workloadTypes.map((option) => (
                       <MenuItem key={option.value} value={option.value}>
@@ -400,7 +428,24 @@ React.useEffect(() => {
               />
             </Grid>
 
-            {/* Ресурсы */}
+            {/* ========== ТЕГИ ========== */}
+            <Grid item xs={12}>
+              <Controller
+                name="tags"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Теги"
+                    placeholder="backend, production, critical (через запятую)"
+                    fullWidth
+                    helperText="Теги для категоризации и поиска"
+                  />
+                )}
+              />
+            </Grid>
+
+            {/* ========== РЕСУРСЫ ========== */}
             <Grid item xs={12}>
               <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
                 Требования к ресурсам
@@ -414,7 +459,6 @@ React.useEffect(() => {
                 rules={{ 
                   required: 'CPU обязательно',
                   min: { value: 1, message: 'Минимум 1 ядро CPU' },
-                  validate: (value) => Number.isInteger(value) || 'Должно быть целое число'
                 }}
                 render={({ field }) => (
                   <TextField
@@ -424,17 +468,7 @@ React.useEffect(() => {
                     error={!!errors.requiredCpu}
                     helperText={errors.requiredCpu?.message}
                     fullWidth
-                    inputProps={{ 
-                      min: 1,
-                      step: 1,
-                      onKeyDown: allowOnlyDigits
-                    }}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value);
-                      if (!isNaN(value) && value >= 1) {
-                        field.onChange(value);
-                      }
-                    }}
+                    inputProps={{ min: 1 }}
                   />
                 )}
               />
@@ -447,11 +481,6 @@ React.useEffect(() => {
                 rules={{ 
                   required: 'Память обязательна',
                   min: { value: 0.5, message: 'Минимум 0.5 ГБ' },
-                  validate: (value) => {
-                    const num = Number(value);
-                    const decimalPart = num.toString().split('.')[1];
-                    return decimalPart ? decimalPart.length <= 1 : true || 'Максимум 1 знак после запятой';
-                  }
                 }}
                 render={({ field }) => (
                   <TextField
@@ -461,18 +490,7 @@ React.useEffect(() => {
                     error={!!errors.requiredMemory}
                     helperText={errors.requiredMemory?.message}
                     fullWidth
-                    inputProps={{ 
-                      min: 0.5,
-                      step: 0.1,
-                      onKeyDown: allowDigitsAndDot
-                    }}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value);
-                      if (!isNaN(value) && value >= 0.5) {
-                        // Округляем до одного знака после запятой
-                        field.onChange(Math.round(value * 10) / 10);
-                      }
-                    }}
+                    inputProps={{ min: 0.5, step: 0.1 }}
                   />
                 )}
               />
@@ -485,7 +503,6 @@ React.useEffect(() => {
                 rules={{ 
                   required: 'Хранилище обязательно',
                   min: { value: 1, message: 'Минимум 1 ГБ' },
-                  validate: (value) => Number.isInteger(value) || 'Должно быть целое число'
                 }}
                 render={({ field }) => (
                   <TextField
@@ -495,319 +512,528 @@ React.useEffect(() => {
                     error={!!errors.requiredStorage}
                     helperText={errors.requiredStorage?.message}
                     fullWidth
-                    inputProps={{ 
-                      min: 1,
-                      step: 1,
-                      onKeyDown: allowOnlyDigits
-                    }}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value);
-                      if (!isNaN(value) && value >= 1) {
-                        field.onChange(value);
-                      }
-                    }}
+                    inputProps={{ min: 1 }}
                   />
                 )}
               />
             </Grid>
 
-            {/* Поля для деплоя */}
+            {/* ========== НОВЫЙ РАЗДЕЛ: КЛАССИФИКАЦИЯ ========== */}
             <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                Конфигурация развертывания
-                <IconButton size="small" sx={{ ml: 1 }}>
-                  <Info fontSize="small" />
-                </IconButton>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                <BusinessCenter sx={{ mr: 1, verticalAlign: 'middle' }} />
+                Классификация нагрузки
               </Typography>
               <Alert severity="info" sx={{ mb: 2 }}>
-                Настройте эти параметры, если хотите развернуть эту нагрузку как Docker-контейнер
+                Эти параметры помогают алгоритму оптимизации выбрать лучшее размещение
               </Alert>
-              {getImageInfo(containerImage)?.isWebService === false && (
-                <Alert severity="warning" sx={{ mb: 2 }}>
-                  <Typography variant="body2">
-                    <strong>Внимание: Это сервис без веб-интерфейса!</strong><br />
-                    • Не открывается в браузере<br />
-                    • Используется для подключения других приложений<br />
-                    • Порт {getImageInfo(containerImage)?.port} используется специальными клиентами
+            </Grid>
+
+            {/* Паттерн использования */}
+            <Grid item xs={12} md={4}>
+              <Controller
+                name="usagePattern"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    select
+                    label="Паттерн использования"
+                    fullWidth
+                    helperText="Как изменяется нагрузка"
+                  >
+                    {usagePatternOptions.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <span>{option.icon}</span>
+                          <Box>
+                            <Typography variant="body2">{option.label}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {option.description}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              />
+            </Grid>
+
+            {/* Класс критичности */}
+            <Grid item xs={12} md={4}>
+              <Controller
+                name="criticality"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    select
+                    label="Класс критичности"
+                    fullWidth
+                    helperText="Важность для бизнеса"
+                  >
+                    {criticalityOptions.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <span>{option.icon}</span>
+                          <Box>
+                            <Typography variant="body2">{option.label}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {option.description}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              />
+            </Grid>
+
+            {/* Уровень бюджета */}
+            <Grid item xs={12} md={4}>
+              <Controller
+                name="budgetTier"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    select
+                    label="Уровень бюджета"
+                    fullWidth
+                    helperText="Приоритет стоимости vs производительности"
+                  >
+                    {budgetTierOptions.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <span>{option.icon}</span>
+                          <Box>
+                            <Typography variant="body2">{option.label}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {option.description}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              />
+            </Grid>
+
+            {/* ========== НОВЫЙ РАЗДЕЛ: ТРЕБОВАНИЯ SLA ========== */}
+            <Grid item xs={12}>
+              <Divider sx={{ my: 2 }} />
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Typography variant="h6" gutterBottom>
+                  <Speed sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Требования SLA
+                </Typography>
+                <Button 
+                  size="small" 
+                  onClick={() => setShowSlaDetails(!showSlaDetails)}
+                >
+                  {showSlaDetails ? 'Скрыть детали' : 'Настроить детали'}
+                </Button>
+              </Box>
+            </Grid>
+
+            {/* Базовые SLA параметры (всегда видны) */}
+            <Grid item xs={12} md={4}>
+              <Controller
+                name="slaRequirements.availabilityTarget"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    type="number"
+                    label="Целевая доступность (%)"
+                    fullWidth
+                    inputProps={{ min: 90, max: 99.999, step: 0.1 }}
+                    helperText="Например: 99.9, 99.99"
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <Controller
+                name="slaRequirements.maxResponseTimeMs"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    type="number"
+                    label="Макс. время отклика (мс)"
+                    fullWidth
+                    inputProps={{ min: 1 }}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <Controller
+                name="slaRequirements.allowedDowntimePerMonth"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    type="number"
+                    label="Допустимый простой (мин/мес)"
+                    fullWidth
+                    inputProps={{ min: 0 }}
+                  />
+                )}
+              />
+            </Grid>
+
+            {/* Детальные SLA параметры (по кнопке) */}
+            {showSlaDetails && (
+              <>
+                <Grid item xs={12} md={4}>
+                  <Controller
+                    name="slaRequirements.minReplicas"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        type="number"
+                        label="Минимум реплик"
+                        fullWidth
+                        inputProps={{ min: 1 }}
+                      />
+                    )}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={4}>
+                  <Controller
+                    name="slaRequirements.maxRecoveryTimeMinutes"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        type="number"
+                        label="Макс. время восстановления (мин)"
+                        fullWidth
+                        inputProps={{ min: 1 }}
+                      />
+                    )}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={4}>
+                  <Controller
+                    name="slaRequirements.requiresRedundancy"
+                    control={control}
+                    render={({ field }) => (
+                      <FormControl fullWidth>
+                        <InputLabel>Резервирование</InputLabel>
+                        <Select
+                          value={field.value ? 'yes' : 'no'}
+                          onChange={(e) => field.onChange(e.target.value === 'yes')}
+                          label="Резервирование"
+                        >
+                          <MenuItem value="yes">Требуется</MenuItem>
+                          <MenuItem value="no">Не требуется</MenuItem>
+                        </Select>
+                      </FormControl>
+                    )}
+                  />
+                </Grid>
+              </>
+            )}
+
+            {/* ========== НОВЫЙ РАЗДЕЛ: БИЗНЕС-ЧАСЫ ========== */}
+            <Grid item xs={12}>
+              <Divider sx={{ my: 2 }} />
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Typography variant="h6" gutterBottom>
+                  <AccessTime sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Бизнес-часы
+                </Typography>
+                <Button 
+                  size="small" 
+                  onClick={() => setShowBusinessHours(!showBusinessHours)}
+                >
+                  {showBusinessHours ? 'Скрыть' : 'Настроить'}
+                </Button>
+              </Box>
+            </Grid>
+
+            {/* Часовой пояс (всегда виден) */}
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="businessHours.timezone"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    select
+                    label="Часовой пояс"
+                    fullWidth
+                  >
+                    {timezoneOptions.map((tz) => (
+                      <MenuItem key={tz} value={tz}>{tz}</MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="businessHours.weekendLoadPercent"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    type="number"
+                    label="Нагрузка в выходные (% от пиковой)"
+                    fullWidth
+                    inputProps={{ min: 0, max: 100 }}
+                  />
+                )}
+              />
+            </Grid>
+
+            {/* Детальные настройки бизнес-часов */}
+            {showBusinessHours && (
+              <>
+                <Grid item xs={12}>
+                  <Controller
+                    name="businessHours.workingDays"
+                    control={control}
+                    render={({ field }) => (
+                      <FormControl fullWidth>
+                        <InputLabel>Рабочие дни</InputLabel>
+                        <Select
+                          multiple
+                          value={field.value || []}
+                          onChange={(e) => field.onChange(e.target.value)}
+                          renderValue={(selected) => (
+                            <Box display="flex" flexWrap="wrap" gap={0.5}>
+                              {(selected as number[]).map((value) => (
+                                <Chip 
+                                  key={value} 
+                                  label={weekDays.find(d => d.value === value)?.label} 
+                                  size="small" 
+                                />
+                              ))}
+                            </Box>
+                          )}
+                          label="Рабочие дни"
+                        >
+                          {weekDays.map((day) => (
+                            <MenuItem key={day.value} value={day.value}>
+                              {day.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    )}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Пиковые часы
                   </Typography>
-                </Alert>
+                  {peakHoursFields.map((field, index) => (
+                    <Box key={field.id} display="flex" gap={2} mb={2}>
+                      <Controller
+                        name={`businessHours.peakHours.${index}.start`}
+                        control={control}
+                        render={({ field }) => (
+                          <TextField
+                            {...field}
+                            label="Начало"
+                            placeholder="09:00"
+                            fullWidth
+                          />
+                        )}
+                      />
+                      <Controller
+                        name={`businessHours.peakHours.${index}.end`}
+                        control={control}
+                        render={({ field }) => (
+                          <TextField
+                            {...field}
+                            label="Конец"
+                            placeholder="18:00"
+                            fullWidth
+                          />
+                        )}
+                      />
+                      <IconButton 
+                        onClick={() => removePeakHour(index)}
+                        disabled={peakHoursFields.length <= 1}
+                      >
+                        <Remove />
+                      </IconButton>
+                    </Box>
+                  ))}
+                  <Button
+                    startIcon={<Add />}
+                    onClick={() => appendPeakHour({ start: '09:00', end: '18:00' })}
+                    size="small"
+                  >
+                    Добавить пиковый период
+                  </Button>
+                </Grid>
+              </>
+            )}
+
+            {/* ========== СУЩЕСТВУЮЩИЙ РАЗДЕЛ: КОНФИГУРАЦИЯ ДЕПЛОЯ ========== */}
+            <Grid item xs={12}>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                Конфигурация развертывания
+              </Typography>
+            </Grid>
+
+            {/* Детали деплоя (без изменений) */}
+            <Grid item xs={12} md={6}>
+              {inputMode === 'select' ? (
+                <Controller
+                  name="containerImage"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      select
+                      label="Container Image"
+                      fullWidth
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        if (newValue === '') {
+                          setInputMode('custom');
+                          field.onChange('');
+                        } else {
+                          field.onChange(newValue);
+                          handleImageChange(newValue);
+                        }
+                      }}
+                    >
+                      {predefinedImages.map((option) => (
+                        <MenuItem key={option.value || 'custom'} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                />
+              ) : (
+                <Controller
+                  name="containerImage"
+                  control={control}
+                  rules={{ required: 'Имя образа обязательно' }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      label="Custom Docker Image"
+                      placeholder="nginx:alpine, postgres:15"
+                      fullWidth
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton 
+                              onClick={() => {
+                                setInputMode('select');
+                                field.onChange('nginx:latest');
+                                handleImageChange('nginx:latest');
+                              }}
+                            >
+                              <ArrowBack />
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  )}
+                />
               )}
             </Grid>
-{/* ВАРИАНТ С ДВУМЯ РЕЖИМАМИ - БОЛЕЕ НАДЕЖНЫЙ */}
-<Grid item xs={12} md={6}>
-  {inputMode === 'select' ? (
-    <Controller
-      name="containerImage"
-      control={control}
-      render={({ field }) => (
-        <TextField
-          {...field}
-          select
-          label="Container Image"
-          fullWidth
-          helperText="Select a predefined image or choose 'Custom Image'"
-          onChange={(e) => {
-            const newValue = e.target.value;
-            if (newValue === '') {
-              // Переключаемся в режим custom
-              setInputMode('custom');
-              // Устанавливаем пустое значение
-              field.onChange('');
-              // Очищаем переменные окружения
-              handleImageChange('');
-            } else {
-              // Обычный выбор из списка
-              field.onChange(newValue);
-              handleImageChange(newValue);
-            }
-          }}
-        >
-          {predefinedImages.map((option) => (
-            <MenuItem key={option.value || 'custom'} value={option.value}>
-              {option.label}
-            </MenuItem>
-          ))}
-        </TextField>
-      )}
-    />
-  ) : (
-    // РЕЖИМ ВВОДА CUSTOM IMAGE
-    <Controller
-      name="containerImage"
-      control={control}
-      rules={{
-        required: 'Имя образа обязательно',
-        validate: (value) => {
-          if (!value || value.trim() === '') {
-            return 'Введите имя Docker образа';
-          }
-          return true;
-        }
-      }}
-      render={({ field, fieldState }) => (
-<TextField
-  {...field}
-  label="Custom Docker Image"
-  placeholder="nginx:alpine, postgres:15, myapp:latest"
-  fullWidth
-  error={!!fieldState.error}
-  helperText={fieldState.error?.message || "Введите имя Docker образа"}
-  InputProps={{
-    endAdornment: (
-      <InputAdornment position="end">
-        <IconButton 
-          onClick={() => {
-            setInputMode('select');
-            // Возвращаем стандартный образ при возврате к списку
-            field.onChange('nginx:latest');
-            handleImageChange('nginx:latest');
-          }}
-          title="Выбрать из списка"
-        >
-          <ArrowBack />
-        </IconButton>
-      </InputAdornment>
-    ),
-  }}
-  // ОБРАБАТЫВАЕМ РУЧНОЙ ВВОД
-  onChange={(e) => {
-    const newValue = e.target.value;
-    field.onChange(newValue);
-    
-    // Если пользователь ввел custom image
-    if (newValue.trim() !== '') {
-      // Проверяем является ли это custom image
-      const isCustom = !predefinedImages.some(img => img.value === newValue);
-      if (isCustom) {
-        // Для custom image предлагаем добавить START_COMMAND, но не навязываем
-        const currentVars = watch('environmentVars');
-        const hasStartCommand = currentVars?.some(v => v.key === 'START_COMMAND');
-        
-        if (!hasStartCommand && (!currentVars || currentVars.length === 0 || 
-            (currentVars.length === 1 && currentVars[0].key === '' && currentVars[0].value === ''))) {
-          // Предлагаем добавить START_COMMAND только если нет других переменных
-          setValue('environmentVars', [{ 
-            key: 'START_COMMAND', 
-            value: ''
-          }]);
-        }
-      }
-    }
-  }}
-/>
-      )}
-    />
-  )}
-</Grid>
 
-{/* КНОПКА ДЛЯ ВОЗВРАТА К ВЫБОРУ ИЗ СПИСКА (если в режиме custom) */}
-{inputMode === 'custom' && (
-  <Grid item xs={12}>
-    <Button
-      startIcon={<ArrowBack />}
-      onClick={() => {
-        setInputMode('select');
-        setValue('containerImage', 'nginx:latest');
-        handleImageChange('nginx:latest');
-      }}
-      variant="outlined"
-      size="small"
-      sx={{ mb: 2 }}
-    >
-      Выбрать из списка
-    </Button>
-  </Grid>
-)}
-{/* ПОКАЗЫВАЕМ ПОЛЯ ДЕПЛОЯ ДЛЯ ЛЮБОГО ОБРАЗА, ВКЛЮЧАЯ CUSTOM */}
-{(showDeploymentFields || containerImage !== undefined) && (
-  <>
-    <Grid item xs={12} md={6}>
-      <Controller
-        name="exposedPort"
-        control={control}
-        rules={{ 
-          min: { value: 1, message: 'Port must be > 0' },
-          max: { value: 65535, message: 'Port must be < 65536' }
-        }}
-        render={({ field }) => (
-          <TextField
-            {...field}
-            type="number"
-            label="Container Port"
-            error={!!errors.exposedPort}
-            helperText={
-              errors.exposedPort?.message || 
-              "Порт, который слушает приложение внутри контейнера"
-            }
-            fullWidth
-          />
-        )}
-      />
-    </Grid>
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="exposedPort"
+                control={control}
+                rules={{ 
+                  min: { value: 1, message: 'Port > 0' },
+                  max: { value: 65535, message: 'Port < 65536' }
+                }}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    type="number"
+                    label="Container Port"
+                    error={!!errors.exposedPort}
+                    helperText="Порт внутри контейнера"
+                    fullWidth
+                  />
+                )}
+              />
+            </Grid>
 
-    {/* ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ ДОСТУПНЫ ДЛЯ CUSTOM IMAGE */}
-    <Grid item xs={12}>
-      <Typography variant="subtitle1" gutterBottom>
-        Environment Variables
-        <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-          (опционально)
-        </Typography>
-      </Typography>
-      
-      {/* ПОДСКАЗКА ДЛЯ CUSTOM IMAGE */}
-{isCustomImage && (
-  <Alert severity="info" sx={{ mb: 2 }}>
-    <Typography variant="body2">
-      Для кастомных образов может потребоваться команда запуска.<br />
-      • Добавьте переменную <strong>START_COMMAND</strong> если образ не имеет точки входа<br />
-      • Можете удалить или изменить ее, если она не требуется<br />
-      • Например: <code>npm start</code>, <code>python app.py</code>, <code>npx serve -s . -l 3000</code>
-    </Typography>
-  </Alert>
-)}
-      
-      {fields.map((field, index) => {
-  const { isRequired, isReserved } = isReservedEnvVar(field.key, containerImage || '');
-  
-  return (
-    <Box key={field.id} display="flex" gap={2} mb={2}>
-      <Controller
-        name={`environmentVars.${index}.key`}
-        control={control}
-        render={({ field: controllerField }) => (
-          <TextField
-            {...controllerField}
-            label="Key"
-            placeholder="START_COMMAND"
-            fullWidth
-            // READONLY ДЛЯ ЗАРЕЗЕРВИРОВАННЫХ И ОБЯЗАТЕЛЬНЫХ ПЕРЕМЕННЫХ
-            InputProps={{
-              readOnly: isRequired || isReserved,
-            }}
-            sx={{
-              '& .MuiInputBase-input.Mui-readOnly': {
-                backgroundColor: isRequired || isReserved ? 'action.hover' : 'inherit',
-                color: isRequired || isReserved ? 'text.primary' : 'inherit',
-                fontWeight: isReserved ? 'bold' : 'normal',
-              }
-            }}
-            helperText={
-              isRequired ? 'Обязательная переменная' :
-              isReserved ? 'Системная переменная (нельзя изменить)' : ''
-            }
-          />
-        )}
-      />
-      <Controller
-        name={`environmentVars.${index}.value`}
-        control={control}
-        rules={{
-          // ВАЛИДАЦИЯ ДЛЯ ОБЯЗАТЕЛЬНЫХ ПЕРЕМЕННЫХ
-          validate: (value) => {
-            if (isRequired && !value.trim()) {
-              return 'Обязательное поле';
-            }
-            if (isReserved && !value.trim()) {
-              return 'Команда запуска обязательна';
-            }
-            return true;
-          }
-        }}
-        render={({ field: controllerField, fieldState }) => (
-          <TextField
-            {...controllerField}
-            label="Value"
-            placeholder={
-              field.key === 'START_COMMAND' ? 
-              'npx serve -s . -l 3000' : 
-              'strong_password'
-            }
-            type={controllerField.name.includes('PASSWORD') ? 'password' : 'text'}
-            fullWidth
-            error={!!fieldState.error}
-            helperText={fieldState.error?.message}
-            // ПОКАЗЫВАЕМ ПОДСКАЗКУ ДЛЯ START_COMMAND
-            InputProps={{
-              ...(field.key === 'START_COMMAND' && {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Terminal fontSize="small" color="action" />
-                  </InputAdornment>
-                ),
-              }),
-            }}
-          />
-        )}
-      />
-      <IconButton 
-        onClick={() => remove(index)}
-        // ЗАПРЕЩАЕМ УДАЛЕНИЕ ОБЯЗАТЕЛЬНЫХ И ЗАРЕЗЕРВИРОВАННЫХ ПЕРЕМЕННЫХ
-        disabled={fields.length <= 1 || isRequired || isReserved}
-        sx={{ mt: 1 }}
-        title={
-          isRequired ? "Обязательную переменную нельзя удалить" :
-          isReserved ? "Системную переменную нельзя удалить" :
-          "Удалить"
-        }
-      >
-        <Remove />
-      </IconButton>
-    </Box>
-  );
-})}
- <Button
-    startIcon={<Add />}
-    onClick={() => append({ key: '', value: '' })}
-    variant="outlined"
-    size="small"
-  >
-    Добавить переменную окружения
-  </Button>
-    </Grid>
-  </>
-)}
+            {/* Переменные окружения */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle1" gutterBottom>
+                Environment Variables
+              </Typography>
+              
+              {envFields.map((field, index) => (
+                <Box key={field.id} display="flex" gap={2} mb={2}>
+                  <Controller
+                    name={`environmentVars.${index}.key`}
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        label="Key"
+                        placeholder="DB_PASSWORD"
+                        fullWidth
+                      />
+                    )}
+                  />
+                  <Controller
+                    name={`environmentVars.${index}.value`}
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        label="Value"
+                        type={field.value?.includes('PASSWORD') ? 'password' : 'text'}
+                        fullWidth
+                      />
+                    )}
+                  />
+                  <IconButton 
+                    onClick={() => removeEnv(index)}
+                    disabled={envFields.length <= 1}
+                  >
+                    <Remove />
+                  </IconButton>
+                </Box>
+              ))}
+              
+              <Button
+                startIcon={<Add />}
+                onClick={() => appendEnv({ key: '', value: '' })}
+                size="small"
+              >
+                Добавить переменную
+              </Button>
+            </Grid>
+
           </Grid>
         </DialogContent>
+        
         <DialogActions>
           <Button onClick={onClose}>Отмена</Button>
           <Button type="submit" variant="contained">
