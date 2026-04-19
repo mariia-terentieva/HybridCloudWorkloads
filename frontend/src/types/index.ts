@@ -254,3 +254,36 @@ export interface BatchMetricsRequest {
   from?: string;
   to?: string;
 }
+
+// ========== ТИПЫ ДЛЯ ЭКСПОРТА ПРОФИЛЕЙ ==========
+
+export interface OptimizationReadyProfile {
+  id: string;
+  name: string;
+  requiredCpu: number;
+  requiredMemory: number;
+  requiredStorage: number;
+  usagePattern: string;
+  criticality: string;
+  budgetTier: string;
+  maxResponseTimeMs: number;
+  availabilityTarget: number;
+  requiresRedundancy: boolean;
+  avgCpuPercent: number;
+  avgMemoryPercent: number;
+  peakCpuPercent: number;
+  peakMemoryPercent: number;
+  avgResponseTimeMs: number;
+  p95ResponseTimeMs: number;
+  avgRequestsPerSecond: number;
+  timezone?: string;
+  weekendLoadPercent: number;
+  tags?: string[];
+  lastProfiledAt: string;
+  recommendations?: string[];
+  additionalData?: Record<string, any>;
+}
+
+export interface BatchProfileRequest {
+  workloadIds: string[];
+}

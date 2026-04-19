@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -75,7 +75,58 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   const [period, setPeriod] = useState<'1h' | '24h' | '7d' | '30d'>('24h');
   const [tab, setTab] = useState<TabValue>('overview');
 
-  // Вычисляем даты в зависимости от выбранного периода
+  // ========== ФУНКЦИИ ДЛЯ ЗАЩИТЫ ОТ НЕКОРРЕКТНЫХ ЗНАЧЕНИЙ ==========
+  
+  /**
+   * Безопасное форматирование числа - защита от NaN, Infinity, null, undefined
+   */
+  const safeNumber = (value: number | undefined | null, defaultValue: number = 0): number => {
+    if (value === undefined || value === null || isNaN(value) || !isFinite(value)) {
+      return defaultValue;
+    }
+    return value;
+  };
+
+  /**
+   * Форматирование процентов с защитой
+   */
+  const formatPercent = (value: number | undefined | null): string => {
+    const safe = safeNumber(value);
+    return `${safe.toFixed(1)}%`;
+  };
+
+  /**
+   * Общее форматирование чисел с защитой
+   */
+  const formatNumber = (value: number | undefined | null): string => {
+    const safe = safeNumber(value);
+    return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(safe);
+  };
+
+  /**
+   * Форматирование байт с защитой
+   */
+  const formatBytes = (bytes: number | undefined | null): string => {
+    const safe = safeNumber(bytes);
+    if (safe === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(safe) / Math.log(k));
+    return `${(safe / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+  };
+
+  /**
+   * Безопасное получение цвета здоровья
+   */
+  const getHealthColor = (value: number | undefined | null, warning: number, critical: number): string => {
+    const safe = safeNumber(value);
+    if (safe >= critical) return '#d32f2f';
+    if (safe >= warning) return '#ed6c02';
+    return '#2e7d32';
+  };
+
+  // ========== ВЫЧИСЛЕНИЕ ДАТ ==========
+  
   const getDateRange = () => {
     const now = new Date();
     switch (period) {
@@ -94,7 +145,8 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
 
   const { from, to } = getDateRange();
 
-  // Запрос агрегированных метрик
+  // ========== ЗАПРОСЫ ДАННЫХ ==========
+  
   const { 
     data: metrics, 
     isLoading: metricsLoading,
@@ -110,9 +162,8 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
     ),
   });
 
-  // Запрос временного ряда
   const {
-    data: timeSeries,
+    data: timeSeriesRaw,
     isLoading: timeSeriesLoading,
   } = useQuery({
     queryKey: ['timeseries', workloadId, from, to],
@@ -124,7 +175,6 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
     ),
   });
 
-  // Запрос профиля производительности
   const {
     data: profile,
     isLoading: profileLoading,
@@ -135,24 +185,60 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
     enabled: tab === 'profile',
   });
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-  };
+  // ========== ОЧИСТКА ДАННЫХ ДЛЯ ГРАФИКОВ ==========
+  
+  const safeTimeSeries = useMemo(() => {
+    if (!timeSeriesRaw || !Array.isArray(timeSeriesRaw)) return [];
+    return timeSeriesRaw.map(point => ({
+      timestamp: point.timestamp,
+      cpu: safeNumber(point.cpu),
+      memory: safeNumber(point.memory),
+      responseTime: safeNumber(point.responseTime),
+      requests: safeNumber(point.requests)
+    }));
+  }, [timeSeriesRaw]);
 
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(num);
-  };
+  // Безопасные метрики
+  const safeMetrics = useMemo(() => {
+    if (!metrics) return null;
+    return {
+      avgCpu: safeNumber(metrics.avgCpu),
+      avgMemory: safeNumber(metrics.avgMemory),
+      peakCpu: safeNumber(metrics.peakCpu),
+      peakMemory: safeNumber(metrics.peakMemory),
+      avgResponseTime: safeNumber(metrics.avgResponseTime),
+      p95ResponseTime: safeNumber(metrics.p95ResponseTime),
+      p99ResponseTime: safeNumber(metrics.p99ResponseTime),
+      availability: safeNumber(metrics.availability, 100),
+      errorCount: safeNumber(metrics.errorCount),
+      avgRps: safeNumber(metrics.avgRps),
+      peakRps: safeNumber(metrics.peakRps),
+      totalNetworkIn: safeNumber(metrics.totalNetworkIn),
+      totalNetworkOut: safeNumber(metrics.totalNetworkOut),
+      sampleCount: safeNumber(metrics.sampleCount)
+    };
+  }, [metrics]);
 
-  const getHealthColor = (value: number, warning: number, critical: number) => {
-    if (value >= critical) return '#d32f2f';
-    if (value >= warning) return '#ed6c02';
-    return '#2e7d32';
-  };
+  // Безопасный профиль
+  const safeProfile = useMemo(() => {
+    if (!profile) return null;
+    return {
+      ...profile,
+      baselineCpu: safeNumber(profile.baselineCpu),
+      baselineMemory: safeNumber(profile.baselineMemory),
+      baselineResponseTime: safeNumber(profile.baselineResponseTime),
+      totalSamples: safeNumber(profile.totalSamples),
+      daysOfData: safeNumber(profile.daysOfData),
+      peakPeriods: profile.peakPeriods?.map(p => ({
+        ...p,
+        avgLoad: safeNumber(p.avgLoad),
+        peakLoad: safeNumber(p.peakLoad)
+      })) || []
+    };
+  }, [profile]);
 
+  // ========== РЕНДЕРИНГ ==========
+  
   if (metricsLoading && !metrics) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight={400}>
@@ -164,7 +250,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   if (metricsError) {
     return (
       <Alert severity="error" sx={{ m: 2 }}>
-        Ошибка загрузки метрик
+        Ошибка загрузки метрик. Возможно, для этой нагрузки еще нет данных.
       </Alert>
     );
   }
@@ -172,11 +258,11 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   return (
     <Box>
       {/* Заголовок и управление периодом */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={1}>
         <Typography variant="h6">
           Метрики: {workloadName}
         </Typography>
-        <Box display="flex" gap={1}>
+        <Box display="flex" gap={1} flexWrap="wrap">
           <Button
             size="small"
             variant={period === '1h' ? 'contained' : 'outlined'}
@@ -218,7 +304,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
       </Tabs>
 
       {/* Overview Tab */}
-      {tab === 'overview' && metrics && (
+      {tab === 'overview' && safeMetrics && (
         <Grid container spacing={3}>
           {/* Ключевые метрики */}
           <Grid item xs={12}>
@@ -232,13 +318,13 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                           CPU
                         </Typography>
                         <Typography variant="h5">
-                          {formatNumber(metrics.avgCpu)}%
+                          {formatPercent(safeMetrics.avgCpu)}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Пик: {formatNumber(metrics.peakCpu)}%
+                          Пик: {formatPercent(safeMetrics.peakCpu)}
                         </Typography>
                       </Box>
-                      <Memory sx={{ fontSize: 40, color: getHealthColor(metrics.avgCpu, 70, 90) }} />
+                      <Memory sx={{ fontSize: 40, color: getHealthColor(safeMetrics.avgCpu, 70, 90) }} />
                     </Box>
                   </CardContent>
                 </Card>
@@ -253,13 +339,13 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                           Память
                         </Typography>
                         <Typography variant="h5">
-                          {formatNumber(metrics.avgMemory)}%
+                          {formatPercent(safeMetrics.avgMemory)}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Пик: {formatNumber(metrics.peakMemory)}%
+                          Пик: {formatPercent(safeMetrics.peakMemory)}
                         </Typography>
                       </Box>
-                      <Storage sx={{ fontSize: 40, color: getHealthColor(metrics.avgMemory, 80, 95) }} />
+                      <Storage sx={{ fontSize: 40, color: getHealthColor(safeMetrics.avgMemory, 80, 95) }} />
                     </Box>
                   </CardContent>
                 </Card>
@@ -274,13 +360,13 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                           Время отклика
                         </Typography>
                         <Typography variant="h5">
-                          {formatNumber(metrics.avgResponseTime)} мс
+                          {formatNumber(safeMetrics.avgResponseTime)} мс
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          P95: {formatNumber(metrics.p95ResponseTime)} мс
+                          P95: {formatNumber(safeMetrics.p95ResponseTime)} мс
                         </Typography>
                       </Box>
-                      <Speed sx={{ fontSize: 40, color: getHealthColor(metrics.avgResponseTime, 200, 500) }} />
+                      <Speed sx={{ fontSize: 40, color: getHealthColor(safeMetrics.avgResponseTime, 200, 500) }} />
                     </Box>
                   </CardContent>
                 </Card>
@@ -295,13 +381,13 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                           Доступность
                         </Typography>
                         <Typography variant="h5">
-                          {formatNumber(metrics.availability)}%
+                          {formatPercent(safeMetrics.availability)}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Ошибок: {metrics.errorCount}
+                          Ошибок: {safeMetrics.errorCount}
                         </Typography>
                       </Box>
-                      {metrics.availability > 99.9 ? (
+                      {safeMetrics.availability > 99.9 ? (
                         <CheckCircle sx={{ fontSize: 40, color: '#2e7d32' }} />
                       ) : (
                         <Warning sx={{ fontSize: 40, color: '#ed6c02' }} />
@@ -320,37 +406,49 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                 <Typography variant="h6" gutterBottom>
                   CPU и Память
                 </Typography>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={timeSeries || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="timestamp" 
-                      tickFormatter={(ts) => format(new Date(ts), 'HH:mm')}
-                    />
-                    <YAxis yAxisId="left" />
-                    <YAxis yAxisId="right" orientation="right" />
-                    <RechartsTooltip 
-                      labelFormatter={(ts) => format(new Date(ts), 'dd.MM.yyyy HH:mm')}
-                    />
-                    <Legend />
-                    <Line 
-                      yAxisId="left"
-                      type="monotone" 
-                      dataKey="cpu" 
-                      stroke="#1976d2" 
-                      name="CPU %"
-                      dot={false}
-                    />
-                    <Line 
-                      yAxisId="left"
-                      type="monotone" 
-                      dataKey="memory" 
-                      stroke="#dc004e" 
-                      name="Память %"
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {safeTimeSeries.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={safeTimeSeries}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="timestamp" 
+                        tickFormatter={(ts) => ts ? format(new Date(ts), 'HH:mm') : ''}
+                      />
+                      <YAxis yAxisId="left" domain={[0, 100]} />
+                      <YAxis yAxisId="right" orientation="right" domain={[0, 100]} />
+                      <RechartsTooltip 
+                        labelFormatter={(ts) => ts ? format(new Date(ts), 'dd.MM.yyyy HH:mm') : ''}
+                        formatter={(value: any) => {
+                          const num = safeNumber(value);
+                          return [`${num.toFixed(1)}%`, ''];
+                        }}
+                      />
+                      <Legend />
+                      <Line 
+                        yAxisId="left"
+                        type="monotone" 
+                        dataKey="cpu" 
+                        stroke="#1976d2" 
+                        name="CPU %"
+                        dot={false}
+                        connectNulls={true}
+                      />
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="memory" 
+                        stroke="#dc004e" 
+                        name="Память %"
+                        dot={false}
+                        connectNulls={true}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Box textAlign="center" py={4}>
+                    <Typography color="text.secondary">Нет данных для отображения</Typography>
+                  </Box>
+                )}
               </CardContent>
             </Card>
           </Grid>
@@ -362,25 +460,37 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                 <Typography variant="h6" gutterBottom>
                   Время отклика
                 </Typography>
-                <ResponsiveContainer width="100%" height={250}>
-                  <AreaChart data={timeSeries || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="timestamp" 
-                      tickFormatter={(ts) => format(new Date(ts), 'HH:mm')}
-                    />
-                    <YAxis />
-                    <RechartsTooltip />
-                    <Area 
-                      type="monotone" 
-                      dataKey="responseTime" 
-                      stroke="#2e7d32" 
-                      fill="#2e7d32" 
-                      fillOpacity={0.3}
-                      name="мс"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {safeTimeSeries.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <AreaChart data={safeTimeSeries}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="timestamp" 
+                        tickFormatter={(ts) => ts ? format(new Date(ts), 'HH:mm') : ''}
+                      />
+                      <YAxis />
+                      <RechartsTooltip 
+                        formatter={(value: any) => {
+                          const num = safeNumber(value);
+                          return [`${num.toFixed(0)} мс`, ''];
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="responseTime" 
+                        stroke="#2e7d32" 
+                        fill="#2e7d32" 
+                        fillOpacity={0.3}
+                        name="мс"
+                        connectNulls={true}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Box textAlign="center" py={4}>
+                    <Typography color="text.secondary">Нет данных для отображения</Typography>
+                  </Box>
+                )}
               </CardContent>
             </Card>
           </Grid>
@@ -392,26 +502,176 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                 <Typography variant="h6" gutterBottom>
                   Запросы в секунду
                 </Typography>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={timeSeries || []}>
+                {safeTimeSeries.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={safeTimeSeries}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="timestamp" 
+                        tickFormatter={(ts) => ts ? format(new Date(ts), 'HH:mm') : ''}
+                      />
+                      <YAxis />
+                      <RechartsTooltip 
+                        formatter={(value: any) => {
+                          const num = safeNumber(value);
+                          return [`${num.toFixed(1)} RPS`, ''];
+                        }}
+                      />
+                      <Bar dataKey="requests" fill="#9c27b0" name="RPS" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Box textAlign="center" py={4}>
+                    <Typography color="text.secondary">Нет данных для отображения</Typography>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Статистика по выборке */}
+          {safeMetrics.sampleCount > 0 && (
+            <Grid item xs={12}>
+              <Alert severity="info" sx={{ mt: 1 }}>
+                Показаны данные за период: {format(new Date(from), 'dd.MM.yyyy HH:mm')} - {format(new Date(to), 'dd.MM.yyyy HH:mm')}
+                {' • '}Количество точек данных: {safeMetrics.sampleCount}
+              </Alert>
+            </Grid>
+          )}
+        </Grid>
+      )}
+
+      {/* CPU Tab */}
+      {tab === 'cpu' && safeMetrics && (
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Детальная метрика CPU
+                </Typography>
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={safeTimeSeries}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis 
                       dataKey="timestamp" 
-                      tickFormatter={(ts) => format(new Date(ts), 'HH:mm')}
+                      tickFormatter={(ts) => ts ? format(new Date(ts), 'dd.MM HH:mm') : ''}
                     />
-                    <YAxis />
-                    <RechartsTooltip />
-                    <Bar dataKey="requests" fill="#9c27b0" name="RPS" />
-                  </BarChart>
+                    <YAxis domain={[0, 100]} />
+                    <RechartsTooltip 
+                      labelFormatter={(ts) => ts ? format(new Date(ts), 'dd.MM.yyyy HH:mm') : ''}
+                      formatter={(value: any) => [`${safeNumber(value).toFixed(1)}%`, 'CPU']}
+                    />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="cpu" 
+                      stroke="#1976d2" 
+                      name="CPU %"
+                      strokeWidth={2}
+                      dot={false}
+                      connectNulls={true}
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
+          </Grid>
+          <Grid item xs={12}>
+            <Alert severity="info">
+              Средняя загрузка CPU: {formatPercent(safeMetrics.avgCpu)} | Пиковая: {formatPercent(safeMetrics.peakCpu)} | P95: {formatPercent(safeMetrics.p95Cpu)}
+            </Alert>
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Memory Tab */}
+      {tab === 'memory' && safeMetrics && (
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Детальная метрика памяти
+                </Typography>
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={safeTimeSeries}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="timestamp" 
+                      tickFormatter={(ts) => ts ? format(new Date(ts), 'dd.MM HH:mm') : ''}
+                    />
+                    <YAxis domain={[0, 100]} />
+                    <RechartsTooltip 
+                      labelFormatter={(ts) => ts ? format(new Date(ts), 'dd.MM.yyyy HH:mm') : ''}
+                      formatter={(value: any) => [`${safeNumber(value).toFixed(1)}%`, 'Память']}
+                    />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="memory" 
+                      stroke="#dc004e" 
+                      name="Память %"
+                      strokeWidth={2}
+                      dot={false}
+                      connectNulls={true}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12}>
+            <Alert severity="info">
+              Среднее использование памяти: {formatPercent(safeMetrics.avgMemory)} | Пиковое: {formatPercent(safeMetrics.peakMemory)} | P95: {formatPercent(safeMetrics.p95Memory)}
+            </Alert>
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Network Tab */}
+      {tab === 'network' && safeMetrics && (
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Входящий трафик
+                </Typography>
+                <Typography variant="h4" color="primary">
+                  {formatBytes(safeMetrics.totalNetworkIn)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  За выбранный период
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Исходящий трафик
+                </Typography>
+                <Typography variant="h4" color="secondary">
+                  {formatBytes(safeMetrics.totalNetworkOut)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  За выбранный период
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12}>
+            <Alert severity="info">
+              Всего трафика: {formatBytes(safeMetrics.totalNetworkIn + safeMetrics.totalNetworkOut)}
+            </Alert>
           </Grid>
         </Grid>
       )}
 
       {/* Profile Tab */}
-      {tab === 'profile' && profile && (
+      {tab === 'profile' && safeProfile && (
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Paper sx={{ p: 3 }}>
@@ -420,7 +680,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                 Профиль производительности
               </Typography>
               <Typography variant="body2" color="text.secondary" paragraph>
-                Рассчитан на основе {profile.totalSamples} измерений за {profile.daysOfData} дней
+                Рассчитан на основе {safeProfile.totalSamples} измерений за {safeProfile.daysOfData} дней
               </Typography>
 
               <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -431,7 +691,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                         Базовый CPU
                       </Typography>
                       <Typography variant="h5">
-                        {formatNumber(profile.baselineCpu)}%
+                        {formatPercent(safeProfile.baselineCpu)}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -443,7 +703,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                         Базовая память
                       </Typography>
                       <Typography variant="h5">
-                        {formatNumber(profile.baselineMemory)}%
+                        {formatPercent(safeProfile.baselineMemory)}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -455,27 +715,27 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                         Базовое время отклика
                       </Typography>
                       <Typography variant="h5">
-                        {formatNumber(profile.baselineResponseTime)} мс
+                        {formatNumber(safeProfile.baselineResponseTime)} мс
                       </Typography>
                     </CardContent>
                   </Card>
                 </Grid>
               </Grid>
 
-              {profile.peakPeriods.length > 0 && (
+              {safeProfile.peakPeriods && safeProfile.peakPeriods.length > 0 && (
                 <>
                   <Typography variant="subtitle1" sx={{ mt: 3, mb: 2 }}>
                     Пиковые периоды
                   </Typography>
                   <List>
-                    {profile.peakPeriods.map((period, idx) => (
+                    {safeProfile.peakPeriods.map((period, idx) => (
                       <ListItem key={idx}>
                         <ListItemIcon>
                           <Timeline />
                         </ListItemIcon>
                         <ListItemText
                           primary={`${period.pattern === 'daily' ? 'Ежедневно' : 'Еженедельно'}: ${period.timeRange}`}
-                          secondary={`Средняя нагрузка: ${formatNumber(period.avgLoad)}%, пик: ${formatNumber(period.peakLoad)}%`}
+                          secondary={`Средняя нагрузка: ${formatPercent(period.avgLoad)}, пик: ${formatPercent(period.peakLoad)}`}
                         />
                       </ListItem>
                     ))}
@@ -483,14 +743,14 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
                 </>
               )}
 
-              {profile.recommendations.length > 0 && (
+              {safeProfile.recommendations && safeProfile.recommendations.length > 0 && (
                 <>
                   <Typography variant="subtitle1" sx={{ mt: 3, mb: 2 }}>
                     <Recommend sx={{ mr: 1, verticalAlign: 'middle' }} />
                     Рекомендации
                   </Typography>
                   <List>
-                    {profile.recommendations.map((rec, idx) => (
+                    {safeProfile.recommendations.map((rec, idx) => (
                       <ListItem key={idx}>
                         <ListItemIcon>
                           {rec.includes('уменьшить') ? <TrendingDown color="success" /> : <TrendingUp color="warning" />}

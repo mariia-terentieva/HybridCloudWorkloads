@@ -24,14 +24,45 @@ public class PerformanceMetricsRepository : IPerformanceMetricsRepository
         _logger = logger;
     }
 
-    public async Task AddMetricAsync(PerformanceMetric metric)
-    {
-        metric.Id = Guid.NewGuid();
-        metric.Timestamp = DateTime.UtcNow;
-        
-        await _context.PerformanceMetrics.AddAsync(metric);
-        await _context.SaveChangesAsync();
-    }
+public async Task AddMetricAsync(PerformanceMetric metric)
+{
+    metric.Id = Guid.NewGuid();
+    metric.Timestamp = DateTime.UtcNow;
+    
+    // Санитизация всех числовых значений
+    metric.CpuUsagePercent = SanitizeDouble(metric.CpuUsagePercent);
+    metric.MemoryUsagePercent = SanitizeDouble(metric.MemoryUsagePercent);
+    metric.MemoryUsageMB = SanitizeDouble(metric.MemoryUsageMB);
+    metric.ResponseTimeMs = SanitizeDouble(metric.ResponseTimeMs);
+    metric.RequestsPerSecond = SanitizeDouble(metric.RequestsPerSecond);
+    metric.NetworkInBytesPerSec = SanitizeLong(metric.NetworkInBytesPerSec);
+    metric.NetworkOutBytesPerSec = SanitizeLong(metric.NetworkOutBytesPerSec);
+    metric.DiskReadOpsPerSec = SanitizeInt(metric.DiskReadOpsPerSec);
+    metric.DiskWriteOpsPerSec = SanitizeInt(metric.DiskWriteOpsPerSec);
+    metric.ErrorCount = SanitizeInt(metric.ErrorCount);
+    
+    await _context.PerformanceMetrics.AddAsync(metric);
+    await _context.SaveChangesAsync();
+}
+
+private double SanitizeDouble(double value)
+{
+    if (double.IsNaN(value) || double.IsInfinity(value) || value < 0)
+        return 0;
+    if (value > 100 && (value < 1000)) // CPU/память не должны быть >100%
+        return Math.Min(value, 100);
+    return Math.Round(value, 2);
+}
+
+private long SanitizeLong(long value)
+{
+    return value < 0 ? 0 : value;
+}
+
+private int SanitizeInt(int value)
+{
+    return value < 0 ? 0 : value;
+}
 
     public async Task AddMetricsBatchAsync(IEnumerable<PerformanceMetric> metrics)
     {
@@ -65,77 +96,76 @@ public class PerformanceMetricsRepository : IPerformanceMetricsRepository
         return await query.ToListAsync();
     }
 
-    public async Task<AggregatedMetrics> GetAggregatedMetricsAsync(
-        Guid workloadId,
-        DateTime from,
-        DateTime to,
-        string periodType = "Day")
+public async Task<AggregatedMetrics> GetAggregatedMetricsAsync(
+    Guid workloadId,
+    DateTime from,
+    DateTime to,
+    string periodType = "Day")
+{
+    var metrics = await _context.PerformanceMetrics
+        .Where(m => m.WorkloadId == workloadId)
+        .Where(m => m.Timestamp >= from && m.Timestamp <= to)
+        .ToListAsync();
+
+    if (!metrics.Any())
     {
-        var metrics = await _context.PerformanceMetrics
-            .Where(m => m.WorkloadId == workloadId)
-            .Where(m => m.Timestamp >= from && m.Timestamp <= to)
-            .ToListAsync();
-
-        if (!metrics.Any())
-        {
-            return new AggregatedMetrics
-            {
-                WorkloadId = workloadId,
-                PeriodStart = from,
-                PeriodEnd = to,
-                PeriodType = periodType,
-                SampleCount = 0
-            };
-        }
-
-        var aggregated = new AggregatedMetrics
+        return new AggregatedMetrics
         {
             WorkloadId = workloadId,
             PeriodStart = from,
             PeriodEnd = to,
             PeriodType = periodType,
-            SampleCount = metrics.Count,
-            
-            // Средние значения
-            AvgCpuUsagePercent = metrics.Average(m => m.CpuUsagePercent),
-            AvgMemoryUsagePercent = metrics.Average(m => m.MemoryUsagePercent),
-            AvgMemoryUsageMB = metrics.Average(m => m.MemoryUsageMB),
-            AvgResponseTimeMs = metrics.Average(m => m.ResponseTimeMs),
-            AvgRequestsPerSecond = metrics.Average(m => m.RequestsPerSecond),
-            
-            // Пиковые значения
-            PeakCpuUsagePercent = metrics.Max(m => m.CpuUsagePercent),
-            PeakMemoryUsagePercent = metrics.Max(m => m.MemoryUsagePercent),
-            PeakMemoryUsageMB = metrics.Max(m => m.MemoryUsageMB),
-            PeakResponseTimeMs = metrics.Max(m => m.ResponseTimeMs),
-            PeakRequestsPerSecond = metrics.Max(m => m.RequestsPerSecond),
-            
-            // Минимальные значения
-            MinCpuUsagePercent = metrics.Min(m => m.CpuUsagePercent),
-            MinMemoryUsagePercent = metrics.Min(m => m.MemoryUsagePercent),
-            
-            // Процентили (P95)
-            P95CpuUsagePercent = CalculatePercentile(metrics.Select(m => m.CpuUsagePercent).ToList(), 95),
-            P95MemoryUsagePercent = CalculatePercentile(metrics.Select(m => m.MemoryUsagePercent).ToList(), 95),
-            P95ResponseTimeMs = CalculatePercentile(metrics.Select(m => m.ResponseTimeMs).ToList(), 95),
-            P99ResponseTimeMs = CalculatePercentile(metrics.Select(m => m.ResponseTimeMs).ToList(), 99),
-            
-            // Суммарные значения
-            TotalNetworkInBytes = metrics.Sum(m => m.NetworkInBytesPerSec),
-            TotalNetworkOutBytes = metrics.Sum(m => m.NetworkOutBytesPerSec),
-            TotalDiskReadOps = metrics.Sum(m => m.DiskReadOpsPerSec),
-            TotalDiskWriteOps = metrics.Sum(m => m.DiskWriteOpsPerSec),
-            TotalErrorCount = metrics.Sum(m => m.ErrorCount),
-            
-            // Доступность
-            UptimeSeconds = metrics.Count(m => m.ContainerStatus == "Running") * 60, // приблизительно
-            AvailabilityPercent = metrics.Any() 
-                ? (double)metrics.Count(m => m.ContainerStatus == "Running") / metrics.Count * 100 
-                : 0
+            SampleCount = 0
         };
-
-        return aggregated;
     }
+
+    // Фильтруем валидные значения для CPU и памяти (0-100%)
+    var validCpuMetrics = metrics.Where(m => m.CpuUsagePercent >= 0 && m.CpuUsagePercent <= 100).ToList();
+    var validMemoryMetrics = metrics.Where(m => m.MemoryUsagePercent >= 0 && m.MemoryUsagePercent <= 100).ToList();
+    
+    var aggregated = new AggregatedMetrics
+    {
+        WorkloadId = workloadId,
+        PeriodStart = from,
+        PeriodEnd = to,
+        PeriodType = periodType,
+        SampleCount = metrics.Count,
+        
+        // Используем валидные данные или 0 по умолчанию
+        AvgCpuUsagePercent = validCpuMetrics.Any() ? validCpuMetrics.Average(m => m.CpuUsagePercent) : 0,
+        AvgMemoryUsagePercent = validMemoryMetrics.Any() ? validMemoryMetrics.Average(m => m.MemoryUsagePercent) : 0,
+        AvgMemoryUsageMB = metrics.Average(m => m.MemoryUsageMB),
+        AvgResponseTimeMs = metrics.Average(m => m.ResponseTimeMs),
+        AvgRequestsPerSecond = metrics.Average(m => m.RequestsPerSecond),
+        
+        PeakCpuUsagePercent = validCpuMetrics.Any() ? validCpuMetrics.Max(m => m.CpuUsagePercent) : 0,
+        PeakMemoryUsagePercent = validMemoryMetrics.Any() ? validMemoryMetrics.Max(m => m.MemoryUsagePercent) : 0,
+        PeakMemoryUsageMB = metrics.Max(m => m.MemoryUsageMB),
+        PeakResponseTimeMs = metrics.Max(m => m.ResponseTimeMs),
+        PeakRequestsPerSecond = metrics.Max(m => m.RequestsPerSecond),
+        
+        MinCpuUsagePercent = validCpuMetrics.Any() ? validCpuMetrics.Min(m => m.CpuUsagePercent) : 0,
+        MinMemoryUsagePercent = validMemoryMetrics.Any() ? validMemoryMetrics.Min(m => m.MemoryUsagePercent) : 0,
+        
+        P95CpuUsagePercent = CalculatePercentile(validCpuMetrics.Select(m => m.CpuUsagePercent).ToList(), 95),
+        P95MemoryUsagePercent = CalculatePercentile(validMemoryMetrics.Select(m => m.MemoryUsagePercent).ToList(), 95),
+        P95ResponseTimeMs = CalculatePercentile(metrics.Select(m => m.ResponseTimeMs).ToList(), 95),
+        P99ResponseTimeMs = CalculatePercentile(metrics.Select(m => m.ResponseTimeMs).ToList(), 99),
+        
+        TotalNetworkInBytes = metrics.Sum(m => m.NetworkInBytesPerSec),
+        TotalNetworkOutBytes = metrics.Sum(m => m.NetworkOutBytesPerSec),
+        TotalDiskReadOps = metrics.Sum(m => m.DiskReadOpsPerSec),
+        TotalDiskWriteOps = metrics.Sum(m => m.DiskWriteOpsPerSec),
+        TotalErrorCount = metrics.Sum(m => m.ErrorCount),
+        
+        UptimeSeconds = metrics.Count(m => m.ContainerStatus == "Running") * 60,
+        AvailabilityPercent = metrics.Any() 
+            ? (double)metrics.Count(m => m.ContainerStatus == "Running") / metrics.Count * 100 
+            : 100
+    };
+
+    return aggregated;
+}
 
     public async Task<Dictionary<Guid, AggregatedMetrics>> GetBatchAggregatedMetricsAsync(
         IEnumerable<Guid> workloadIds,

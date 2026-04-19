@@ -2,9 +2,10 @@ using HybridCloudWorkloads.Core.Entities;
 using HybridCloudWorkloads.Infrastructure.Data;
 using HybridCloudWorkloads.Infrastructure.Entities;
 using HybridCloudWorkloads.Infrastructure.Services;
-using HybridCloudWorkloads.Core.Interfaces; // ДОБАВЛЕНО для IPerformanceMetricsRepository
-using HybridCloudWorkloads.Infrastructure.Repositories; // ДОБАВЛЕНО для PerformanceMetricsRepository
-using HybridCloudWorkloads.API.Services; // ДОБАВЛЕНО для MetricsCleanupService
+using HybridCloudWorkloads.Infrastructure.Services.CloudProviders;
+using HybridCloudWorkloads.Core.Interfaces;
+using HybridCloudWorkloads.Infrastructure.Repositories;
+using HybridCloudWorkloads.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -112,8 +113,19 @@ builder.Services.AddCors(options =>
 // Регистрация репозиториев и сервисов
 builder.Services.AddScoped<IPerformanceMetricsRepository, PerformanceMetricsRepository>();
 builder.Services.AddHostedService<MetricsCleanupService>();
+builder.Services.AddScoped<IWorkloadProfileExporter, WorkloadProfileExporter>();
 // Фоновый сервис для сбора метрик
 builder.Services.AddHostedService<MetricsCollectorService>();
+// Регистрация сервисов синхронизации с облачными провайдерами
+builder.Services.AddScoped<AwsProviderSync>();
+builder.Services.AddScoped<AzureProviderSync>();
+builder.Services.AddScoped<GcpProviderSync>();
+builder.Services.AddScoped<YandexProviderSync>();
+builder.Services.AddScoped<VkProviderSync>();
+builder.Services.AddSingleton<ICloudProviderSyncFactory, CloudProviderSyncFactory>();
+builder.Services.AddScoped<ISyncService, SyncService>();
+// Фоновый сервис синхронизации
+builder.Services.AddHostedService<CloudProviderSyncBackgroundService>();
 
 var app = builder.Build();
 
@@ -129,11 +141,17 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Initialize database
+// Initialize database and seed cloud providers
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    
+    // Применяем миграции
     context.Database.Migrate();
+    
+    // Заполняем данные провайдеров
+    await SeedData.InitializeCloudProvidersAsync(context, logger);
 }
 
 app.Run();

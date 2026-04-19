@@ -22,6 +22,560 @@ namespace HybridCloudWorkloads.Infrastructure.src.HybridCloudWorkloads.Infrastru
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.CloudProvider", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApiEndpoint")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("AuthConfig")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("AuthType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("api-key");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("LastSyncAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("SyncEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SyncIntervalMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("CloudProviders");
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.CloudRegion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AvailabilityZones")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AvailableServices")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Compliance")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Continent")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Coordinates")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("ProviderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProviderId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("CloudRegions");
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.CloudService", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("DocumentationUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("FreeTier")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PricingModel")
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("ProviderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ServiceType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Compute");
+
+                    b.Property<string>("SlaInfo")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProviderId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("CloudServices");
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.Discount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AppliesTo")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Conditions")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Promotional");
+
+                    b.Property<decimal?>("MaximumDiscount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("MinimumSpend")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PromoCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("ProviderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ValidFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ValidUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProviderId");
+
+                    b.ToTable("Discounts");
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.InstancePricing", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("USD");
+
+                    b.Property<decimal?>("DataTransferInGb")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal?>("DataTransferInterRegionGb")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal?>("DataTransferOutGb")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<DateTime>("EffectiveDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ExpirationDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InstanceTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("LoadBalancerHourly")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("jsonb");
+
+                    b.Property<decimal>("OnDemandHourly")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal>("OnDemandMonthly")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("Reserved1YearAllUpfront")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal?>("Reserved1YearNoUpfront")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal?>("Reserved1YearPartialUpfront")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal?>("Reserved1YearSavingsPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal?>("Reserved3YearAllUpfront")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal?>("Reserved3YearNoUpfront")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal?>("Reserved3YearPartialUpfront")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal?>("Reserved3YearSavingsPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal?>("SpotAveragePrice")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal?>("SpotCurrentPrice")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<double?>("SpotInterruptionRate")
+                        .HasColumnType("double precision");
+
+                    b.Property<decimal?>("SpotMaxPrice")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal?>("SpotMinPrice")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal?>("SpotSavingsPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal?>("StaticIpMonthly")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("StorageGbMonthly")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EffectiveDate");
+
+                    b.HasIndex("InstanceTypeId");
+
+                    b.ToTable("InstancePricing");
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.InstanceType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Availability")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("General Purpose");
+
+                    b.Property<string>("CpuArchitecture")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("x86_64");
+
+                    b.Property<double?>("CpuClockSpeedGhz")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("CpuModel")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("CpuType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Dedicated");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("DedicatedHostSupported")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("EbsOptimized")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("EnhancedNetworking")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Family")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("Generation")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("GpuCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("GpuMemoryGb")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("GpuModel")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("HasFpga")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("HasGpu")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("LocalStorageDisks")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("LocalStorageGb")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("MaxEbsBandwidthMbps")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("MaxIops")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("MemoryGb")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("NetworkBandwidthGbps")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("NetworkPerformance")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("PerformanceCharacteristics")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("PhysicalProcessor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("PlacementGroupSupported")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ProviderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RegionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ServiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("StorageType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("EBS");
+
+                    b.Property<string>("TypeCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double>("VcpuCount")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("VirtualizationType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("HVM");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RegionId");
+
+                    b.HasIndex("ServiceId");
+
+                    b.HasIndex("ProviderId", "RegionId", "TypeCode")
+                        .IsUnique();
+
+                    b.ToTable("InstanceTypes");
+                });
+
             modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.PerformanceMetric", b =>
                 {
                     b.Property<Guid>("Id")
@@ -403,6 +957,76 @@ namespace HybridCloudWorkloads.Infrastructure.src.HybridCloudWorkloads.Infrastru
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.CloudRegion", b =>
+                {
+                    b.HasOne("HybridCloudWorkloads.Core.Entities.CloudProvider", "Provider")
+                        .WithMany("Regions")
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Provider");
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.CloudService", b =>
+                {
+                    b.HasOne("HybridCloudWorkloads.Core.Entities.CloudProvider", "Provider")
+                        .WithMany("Services")
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Provider");
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.Discount", b =>
+                {
+                    b.HasOne("HybridCloudWorkloads.Core.Entities.CloudProvider", "Provider")
+                        .WithMany("Discounts")
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Provider");
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.InstancePricing", b =>
+                {
+                    b.HasOne("HybridCloudWorkloads.Core.Entities.InstanceType", "InstanceType")
+                        .WithMany("Pricing")
+                        .HasForeignKey("InstanceTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InstanceType");
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.InstanceType", b =>
+                {
+                    b.HasOne("HybridCloudWorkloads.Core.Entities.CloudProvider", "Provider")
+                        .WithMany()
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HybridCloudWorkloads.Core.Entities.CloudRegion", "Region")
+                        .WithMany("InstanceTypes")
+                        .HasForeignKey("RegionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HybridCloudWorkloads.Core.Entities.CloudService", "Service")
+                        .WithMany("InstanceTypes")
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Provider");
+
+                    b.Navigation("Region");
+
+                    b.Navigation("Service");
+                });
+
             modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.PerformanceMetric", b =>
                 {
                     b.HasOne("HybridCloudWorkloads.Core.Entities.Workload", "Workload")
@@ -472,6 +1096,30 @@ namespace HybridCloudWorkloads.Infrastructure.src.HybridCloudWorkloads.Infrastru
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.CloudProvider", b =>
+                {
+                    b.Navigation("Discounts");
+
+                    b.Navigation("Regions");
+
+                    b.Navigation("Services");
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.CloudRegion", b =>
+                {
+                    b.Navigation("InstanceTypes");
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.CloudService", b =>
+                {
+                    b.Navigation("InstanceTypes");
+                });
+
+            modelBuilder.Entity("HybridCloudWorkloads.Core.Entities.InstanceType", b =>
+                {
+                    b.Navigation("Pricing");
                 });
 
             modelBuilder.Entity("HybridCloudWorkloads.Infrastructure.Entities.User", b =>
