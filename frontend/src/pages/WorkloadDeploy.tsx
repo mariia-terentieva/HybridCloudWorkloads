@@ -24,15 +24,16 @@ import {
   PlayArrow,
   Stop,
   Delete,
-  Refresh,
   OpenInNew,
   Add,
   CloudUpload,
   ArrowBack,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { workloadService } from '../services/workloadService';
-import { Workload } from '../types';
+import { Workload, UpdateWorkloadRequest } from '../types';
+import { isWebService } from '../utils/dockerImages';
 
 interface DeploymentFormData {
   containerImage: string;
@@ -52,6 +53,7 @@ const predefinedImages = [
 ];
 
 export const WorkloadDeploy: React.FC = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedWorkload, setSelectedWorkload] = React.useState<Workload | null>(null);
   const [deployDialogOpen, setDeployDialogOpen] = React.useState(false);
@@ -68,23 +70,58 @@ export const WorkloadDeploy: React.FC = () => {
 
   const deployMutation = useMutation({
     mutationFn: async ({ workloadId, formData }: { workloadId: string; formData: DeploymentFormData }) => {
-      // Обновляем workload с данными деплоя
-      await workloadService.update(workloadId, {
-        ...workloads?.find(w => w.id === workloadId),
-        containerImage: formData.containerImage,
-        exposedPort: formData.exposedPort,
-        environmentVariables: formData.environmentVariables,
-      });
+      // Находим workload для обновления
+      const workload = workloads?.find(w => w.id === workloadId);
+      
+      if (workload) {
+        // === ИСПРАВЛЕННЫЙ ВЫЗОВ UPDATE ===
+        const updateData: UpdateWorkloadRequest = {
+          name: workload.name,
+          type: workload.type,
+          requiredCpu: workload.requiredCpu,
+          requiredMemory: workload.requiredMemory,
+          requiredStorage: workload.requiredStorage,
+          containerImage: formData.containerImage,
+          exposedPort: formData.exposedPort,
+          environmentVariables: formData.environmentVariables,
+          usagePattern: workload.usagePattern,
+          criticality: workload.criticality,
+          budgetTier: workload.budgetTier,
+        };
+        
+        // Добавляем опциональные поля, если они есть
+        if (workload.description) {
+          updateData.description = workload.description;
+        }
+        if (workload.slaRequirements) {
+          updateData.slaRequirements = workload.slaRequirements;
+        }
+        if (workload.businessHours) {
+          updateData.businessHours = workload.businessHours;
+        }
+        if (workload.tags) {
+          updateData.tags = workload.tags;
+        }
+        
+        await workloadService.update(workloadId, updateData);
+      }
 
       // Вызываем API деплоя
       const response = await fetch(`/api/deployment/deploy/${workloadId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Ошибка развертывания');
+      }
+      
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workloads'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
       setDeployDialogOpen(false);
     },
   });
@@ -94,10 +131,14 @@ export const WorkloadDeploy: React.FC = () => {
       const response = await fetch(`/api/deployment/stop/${workloadId}`, {
         method: 'POST',
       });
+      if (!response.ok) {
+        throw new Error('Ошибка остановки');
+      }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workloads'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
     },
   });
 
@@ -106,15 +147,27 @@ export const WorkloadDeploy: React.FC = () => {
       const response = await fetch(`/api/deployment/remove/${workloadId}`, {
         method: 'DELETE',
       });
+      if (!response.ok) {
+        throw new Error('Ошибка удаления');
+      }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workloads'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
     },
   });
 
   const handleDeploy = (workload: Workload) => {
     setSelectedWorkload(workload);
+    
+    // Предзаполняем форму существующими данными
+    setDeployForm({
+      containerImage: workload.containerImage || 'nginx:latest',
+      exposedPort: workload.exposedPort || 80,
+      environmentVariables: workload.environmentVariables || '',
+    });
+    
     setDeployDialogOpen(true);
   };
 
@@ -127,6 +180,18 @@ export const WorkloadDeploy: React.FC = () => {
     }
   };
 
+  const handleStop = (workloadId: string) => {
+    if (window.confirm('Остановить это развертывание?')) {
+      stopMutation.mutate(workloadId);
+    }
+  };
+
+  const handleRemove = (workloadId: string) => {
+    if (window.confirm('Удалить это развертывание?')) {
+      removeMutation.mutate(workloadId);
+    }
+  };
+
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'Running': return 'success';
@@ -134,6 +199,28 @@ export const WorkloadDeploy: React.FC = () => {
       case 'Stopped': return 'warning';
       case 'Error': return 'error';
       default: return 'default';
+    }
+  };
+
+  const getStatusLabel = (status?: string): string => {
+    switch (status) {
+      case 'Running': return 'Работает';
+      case 'Deploying': return 'Развертывается';
+      case 'Stopped': return 'Остановлено';
+      case 'Error': return 'Ошибка';
+      case 'NotDeployed': return 'Не развернуто';
+      default: return status || 'Неизвестно';
+    }
+  };
+
+  const getTypeLabel = (type: string): string => {
+    switch (type) {
+      case 'VirtualMachine': return 'Виртуальная машина';
+      case 'Database': return 'База данных';
+      case 'Container': return 'Контейнер';
+      case 'WebService': return 'Веб-сервис';
+      case 'BatchJob': return 'Пакетное задание';
+      default: return type;
     }
   };
 
@@ -148,14 +235,14 @@ export const WorkloadDeploy: React.FC = () => {
             <Button
               variant="outlined"
               startIcon={<ArrowBack />}
-              onClick={() => window.location.href = '/dashboard'}
+              onClick={() => navigate('/dashboard')}
             >
               На панель
             </Button>
             <Button
               variant="contained"
               startIcon={<CloudUpload />}
-              onClick={() => window.location.href = '/workloads'}
+              onClick={() => navigate('/workloads')}
             >
               Создать нагрузку
             </Button>
@@ -174,22 +261,15 @@ export const WorkloadDeploy: React.FC = () => {
                       {workload.name}
                     </Typography>
                     
-                    <Box display="flex" alignItems="center" gap={1} mb={2}>
+                    <Box display="flex" alignItems="center" gap={1} mb={2} flexWrap="wrap">
                       <Chip
-                        label={workload.type === 'VirtualMachine' ? 'Виртуальная машина' :
-                               workload.type === 'Database' ? 'База данных' :
-                               workload.type === 'Container' ? 'Контейнер' :
-                               workload.type === 'WebService' ? 'Веб-сервис' :
-                               workload.type === 'BatchJob' ? 'Пакетное задание' : workload.type}
+                        label={getTypeLabel(workload.type)}
                         size="small"
                         variant="outlined"
                       />
                       {workload.deploymentStatus && (
                         <Chip
-                          label={workload.deploymentStatus === 'Running' ? 'Работает' :
-                                 workload.deploymentStatus === 'Deploying' ? 'Развертывается' :
-                                 workload.deploymentStatus === 'Stopped' ? 'Остановлено' :
-                                 workload.deploymentStatus === 'Error' ? 'Ошибка' : workload.deploymentStatus}
+                          label={getStatusLabel(workload.deploymentStatus)}
                           size="small"
                           color={getStatusColor(workload.deploymentStatus) as any}
                         />
@@ -199,9 +279,15 @@ export const WorkloadDeploy: React.FC = () => {
                     <Typography variant="body2" color="text.secondary" paragraph>
                       CPU: {workload.requiredCpu} ядер | ОЗУ: {workload.requiredMemory} ГБ | Хранилище: {workload.requiredStorage} ГБ
                     </Typography>
+                    
+                    {workload.containerImage && (
+                      <Typography variant="body2" color="text.secondary">
+                        Образ: {workload.containerImage} | Порт: {workload.exposedPort || 80}
+                      </Typography>
+                    )}
 
-                    {workload.accessUrl && (
-                      <Alert severity="info" sx={{ mb: 2 }}>
+                    {workload.accessUrl && isWebService(workload.containerImage) && (
+                      <Alert severity="info" sx={{ mb: 2, mt: 2 }}>
                         <Box display="flex" alignItems="center" justifyContent="space-between">
                           <Typography variant="body2">
                             Доступ: {workload.accessUrl}
@@ -218,7 +304,7 @@ export const WorkloadDeploy: React.FC = () => {
                   </CardContent>
 
                   <CardActions>
-                    {!workload.deploymentStatus || workload.deploymentStatus === 'NotDeployed' ? (
+                    {(!workload.deploymentStatus || workload.deploymentStatus === 'NotDeployed') && (
                       <Button
                         size="small"
                         startIcon={<PlayArrow />}
@@ -227,28 +313,40 @@ export const WorkloadDeploy: React.FC = () => {
                       >
                         Развернуть
                       </Button>
-                    ) : workload.deploymentStatus === 'Running' ? (
+                    )}
+                    
+                    {workload.deploymentStatus === 'Running' && (
                       <Button
                         size="small"
                         color="warning"
                         startIcon={<Stop />}
-                        onClick={() => stopMutation.mutate(workload.id)}
+                        onClick={() => handleStop(workload.id)}
                         disabled={stopMutation.isPending}
                       >
                         Остановить
                       </Button>
-                    ) : null}
+                    )}
 
                     {(workload.deploymentStatus === 'Stopped' || workload.deploymentStatus === 'Error') && (
-                      <Button
-                        size="small"
-                        color="error"
-                        startIcon={<Delete />}
-                        onClick={() => removeMutation.mutate(workload.id)}
-                        disabled={removeMutation.isPending}
-                      >
-                        Удалить
-                      </Button>
+                      <>
+                        <Button
+                          size="small"
+                          startIcon={<PlayArrow />}
+                          onClick={() => handleDeploy(workload)}
+                          disabled={deployMutation.isPending}
+                        >
+                          Перезапустить
+                        </Button>
+                        <Button
+                          size="small"
+                          color="error"
+                          startIcon={<Delete />}
+                          onClick={() => handleRemove(workload.id)}
+                          disabled={removeMutation.isPending}
+                        >
+                          Удалить
+                        </Button>
+                      </>
                     )}
                   </CardActions>
                 </Card>
@@ -266,7 +364,7 @@ export const WorkloadDeploy: React.FC = () => {
             <Button
               variant="contained"
               startIcon={<Add />}
-              onClick={() => window.location.href = '/workloads'}
+              onClick={() => navigate('/workloads')}
             >
               Создать нагрузку
             </Button>
@@ -275,7 +373,7 @@ export const WorkloadDeploy: React.FC = () => {
       </Paper>
 
       {/* Диалог настройки развертывания */}
-      <Dialog open={deployDialogOpen} onClose={() => setDeployDialogOpen(false)}>
+      <Dialog open={deployDialogOpen} onClose={() => setDeployDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Развернуть нагрузку</DialogTitle>
         <DialogContent>
           {selectedWorkload && (
@@ -283,6 +381,10 @@ export const WorkloadDeploy: React.FC = () => {
               <Typography variant="subtitle2" gutterBottom>
                 Нагрузка: {selectedWorkload.name}
               </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Требования: {selectedWorkload.requiredCpu} CPU, {selectedWorkload.requiredMemory} ГБ RAM
+              </Typography>
+              
               <TextField
                 select
                 fullWidth
@@ -303,8 +405,9 @@ export const WorkloadDeploy: React.FC = () => {
                 label="Открытый порт"
                 type="number"
                 value={deployForm.exposedPort}
-                onChange={(e) => setDeployForm({ ...deployForm, exposedPort: parseInt(e.target.value) })}
+                onChange={(e) => setDeployForm({ ...deployForm, exposedPort: parseInt(e.target.value) || 80 })}
                 sx={{ mt: 2 }}
+                inputProps={{ min: 1, max: 65535 }}
               />
               
               <TextField
@@ -316,6 +419,7 @@ export const WorkloadDeploy: React.FC = () => {
                 onChange={(e) => setDeployForm({ ...deployForm, environmentVariables: e.target.value })}
                 sx={{ mt: 2 }}
                 placeholder='{"KEY": "value", "DB_HOST": "localhost"}'
+                helperText="Оставьте пустым, если не требуется"
               />
             </Box>
           )}

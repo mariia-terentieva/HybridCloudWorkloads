@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -7,26 +7,18 @@ import {
   Box,
   CircularProgress,
   Alert,
-  Chip,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Button,
   Paper,
-  Divider,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
   Tab,
   Tabs,
-  Tooltip,
 } from '@mui/material';
 import {
   Memory,
   Speed,
-  NetworkCheck,
   Storage,
   Warning,
   CheckCircle,
@@ -49,15 +41,10 @@ import {
   Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { metricsService } from '../services/metricsService';
-import { AggregatedMetrics, PerformanceProfile } from '../types';
-import { format, subDays, subWeeks, subMonths } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { format, subDays } from 'date-fns';
 
 interface MetricsDashboardProps {
   workloadId: string;
@@ -66,7 +53,7 @@ interface MetricsDashboardProps {
 
 type TabValue = 'overview' | 'cpu' | 'memory' | 'network' | 'profile';
 
-const COLORS = ['#1976d2', '#dc004e', '#2e7d32', '#ed6c02', '#9c27b0'];
+//const COLORS = ['#1976d2', '#dc004e', '#2e7d32', '#ed6c02', '#9c27b0'];
 
 export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   workloadId,
@@ -151,7 +138,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
     data: metrics, 
     isLoading: metricsLoading,
     error: metricsError,
-    refetch: refetchMetrics
+    //refetch: refetchMetrics
   } = useQuery({
     queryKey: ['metrics', workloadId, period],
     queryFn: () => metricsService.getAggregatedMetrics(
@@ -164,7 +151,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
 
   const {
     data: timeSeriesRaw,
-    isLoading: timeSeriesLoading,
+    //isLoading: timeSeriesLoading,
   } = useQuery({
     queryKey: ['timeseries', workloadId, from, to],
     queryFn: () => metricsService.getTimeSeries(
@@ -177,8 +164,8 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
 
   const {
     data: profile,
-    isLoading: profileLoading,
-    refetch: refetchProfile,
+    //isLoading: profileLoading,
+    //refetch: refetchProfile,
   } = useQuery({
     queryKey: ['profile', workloadId],
     queryFn: () => metricsService.getPerformanceProfile(workloadId),
@@ -215,7 +202,9 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
       peakRps: safeNumber(metrics.peakRps),
       totalNetworkIn: safeNumber(metrics.totalNetworkIn),
       totalNetworkOut: safeNumber(metrics.totalNetworkOut),
-      sampleCount: safeNumber(metrics.sampleCount)
+      sampleCount: safeNumber(metrics.sampleCount),
+      p95Cpu: (metrics as any).p95Cpu || 0,
+      p95Memory: (metrics as any).p95Memory || 0
     };
   }, [metrics]);
 

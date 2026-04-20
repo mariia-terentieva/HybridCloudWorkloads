@@ -26,18 +26,16 @@ import {
   Add,
   TrendingUp,
   Cloud,
-  Security,
   Settings,
-  Person,
   ArrowForward,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import { workloadService } from '../services/workloadService';
-import { Workload } from '../types';
+//import { Workload } from '../types';
 import { getTypeLabel, getStatusLabel } from '../utils/translations';
-import { isWebService } from '../utils/dockerImages';
+//import { isWebService } from '../utils/dockerImages';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -396,6 +394,12 @@ export const Dashboard: React.FC = () => {
                       </ListItemIcon>
                       <ListItemText primary="Посмотреть развертывания" />
                     </ListItem>
+        <ListItem button onClick={() => navigate('/providers')}>
+          <ListItemIcon>
+            <Storage color="primary" />
+          </ListItemIcon>
+          <ListItemText primary="Облачные провайдеры" />
+        </ListItem>
                     <ListItem button onClick={() => navigate('/profile')}>
                       <ListItemIcon>
                         <Settings color="action" />

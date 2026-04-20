@@ -1,5 +1,5 @@
 import { api } from './api';
-import { OptimizationReadyProfile, BatchProfileRequest } from '../types';
+import { OptimizationReadyProfile } from '../types';
 
 export const profileService = {
   // Экспорт профиля в JSON

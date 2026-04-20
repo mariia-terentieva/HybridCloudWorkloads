@@ -28,7 +28,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { workloadService } from '../services/workloadService';
 import { getTypeLabel, getStatusLabel } from '../utils/translations';
 import { useNavigate } from 'react-router-dom';
-import { isWebService, getImageLabel, getImageInfo } from '../utils/dockerImages';
+import { isWebService, getImageInfo } from '../utils/dockerImages';
 
 export const Deployments: React.FC = () => {
   const navigate = useNavigate();
@@ -187,7 +187,10 @@ export const Deployments: React.FC = () => {
                       <Alert severity="info" sx={{ mt: 2 }}>
                         <Typography variant="body2">
                           <strong>Сервис без веб-интерфейса</strong><br />
-                          Подключение через порт {getImageInfo(deployment.containerImage)?.port}<br />
+      {(() => {
+        const imageInfo = getImageInfo(deployment.containerImage || '');
+        return <>Подключение через порт {imageInfo?.port || 80}<br /></>;
+      })()}
                           <small>Используйте специализированные клиенты для подключения</small>
                         </Typography>
                       </Alert>

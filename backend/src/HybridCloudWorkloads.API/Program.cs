@@ -22,9 +22,10 @@ builder.Services.AddControllers();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals;
-        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 //
 builder.Services.AddScoped<DockerService>();
@@ -126,6 +127,11 @@ builder.Services.AddSingleton<ICloudProviderSyncFactory, CloudProviderSyncFactor
 builder.Services.AddScoped<ISyncService, SyncService>();
 // Фоновый сервис синхронизации
 builder.Services.AddHostedService<CloudProviderSyncBackgroundService>();
+// Кэширование в памяти
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IPricingCacheService, PricingCacheService>();
+// Фоновый сервис очистки кэша
+builder.Services.AddHostedService<CacheCleanupBackgroundService>();
 
 var app = builder.Build();
 

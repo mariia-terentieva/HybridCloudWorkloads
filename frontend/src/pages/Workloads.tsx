@@ -6,7 +6,6 @@ import {
   Button,
   Box,
   TextField,
-  IconButton,
   Chip,
   Alert,
   Tooltip,
@@ -43,12 +42,15 @@ import { WorkloadForm } from '../components/WorkloadForm';
 import { workloadService } from '../services/workloadService';
 import { Workload, CreateWorkloadRequest, UpdateWorkloadRequest } from '../types';
 import { getTypeLabel, getStatusLabel } from '../utils/translations';
-import { isWebService, getImageLabel } from '../utils/dockerImages';
-import { ProfileExportButton } from '../components/ProfileExportButton';
+import { isWebService } from '../utils/dockerImages';
+//import { ProfileExportButton } from '../components/ProfileExportButton';
 import { profileService } from '../services/profileService';
+import { useNavigate } from 'react-router-dom';
+import { Storage } from '@mui/icons-material';   
 
 export const Workloads: React.FC = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate(); 
   const [search, setSearch] = React.useState('');
   const [formOpen, setFormOpen] = React.useState(false);
   const [editingWorkload, setEditingWorkload] = React.useState<Workload | null>(null);
@@ -493,6 +495,13 @@ const handleBatchExport = async (format: 'csv' | 'json') => {
             >
               На главную
             </Button>
+  <Button
+    variant="outlined"
+    startIcon={<Storage />}
+    onClick={() => navigate('/providers')}
+  >
+    Провайдеры
+  </Button>
             <Button
               variant="contained"
               startIcon={<Add />}

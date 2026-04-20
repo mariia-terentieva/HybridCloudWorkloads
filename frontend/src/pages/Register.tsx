@@ -42,7 +42,7 @@ export const Register: React.FC = () => {
   });
 
   const password = watch('password');
-  const confirmPassword = watch('confirmPassword');
+  //const confirmPassword = watch('confirmPassword');
 
   const validatePassword = (value: string) => {
     if (value.length < 6) {

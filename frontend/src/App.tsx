@@ -1,4 +1,4 @@
-import React from 'react';
+//import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -10,6 +10,7 @@ import { Deployments } from './pages/Deployments';
 import { Workloads } from './pages/Workloads';
 import { ProfileSettings } from './pages/ProfileSettings';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { Providers } from './pages/Providers'; 
 import { useAuthStore } from './store/authStore';
 
 const theme = createTheme({
@@ -90,6 +91,7 @@ function AppContent() {
           }
         />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/providers" element={<ProtectedRoute><Providers /></ProtectedRoute>} />
       </Routes>
     </Router>
   );

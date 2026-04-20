@@ -1,4 +1,16 @@
-// Существующие функции
+interface SlaRequirement {
+  maxResponseTimeMs: number;
+  allowedDowntimePerMonth: number;
+  availabilityTarget: number;
+}
+
+interface BusinessHours {
+  timezone: string;
+  peakHours: { start: string; end: string }[];
+  weekendLoadPercent: number;
+  workingDays: number[];
+}
+// функции
 export const getTypeLabel = (type?: string): string => {
   if (!type) return '';
   
@@ -155,14 +167,14 @@ export const formatSlaRequirements = (sla?: SlaRequirement): string => {
 export const formatBusinessHours = (hours?: BusinessHours): string => {
   if (!hours) return 'Круглосуточно';
   
-  const days = hours.workingDays.map(d => {
-    const daysMap: Record<number, string> = {
-      1: 'Пн', 2: 'Вт', 3: 'Ср', 4: 'Чт', 5: 'Пт', 6: 'Сб', 7: 'Вс'
-    };
-    return daysMap[d];
-  }).join(', ');
+  const daysMap: Record<number, string> = {
+    1: 'Пн', 2: 'Вт', 3: 'Ср', 4: 'Чт', 5: 'Пт', 6: 'Сб', 7: 'Вс'
+  };
+  const days = hours.workingDays.map((d: number) => daysMap[d]).join(', ');
   
-  const peakHours = hours.peakHours.map(h => `${h.start}-${h.end}`).join(', ');
+  const peakHours = hours.peakHours.map((h: { start: string; end: string }) => 
+    `${h.start}-${h.end}`
+  ).join(', ');
   
   return `${days}: ${peakHours || 'нет пиковых часов'} (${hours.timezone}), ` +
          `выходные: ${hours.weekendLoadPercent}% нагрузки`;

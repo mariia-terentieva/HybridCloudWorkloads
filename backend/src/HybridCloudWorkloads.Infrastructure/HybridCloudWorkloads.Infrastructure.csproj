@@ -39,6 +39,9 @@
     
     <!-- GCP SDK -->
     <PackageReference Include="Google.Cloud.Compute.V1" Version="3.4.0" />
+
+    <!-- Кэширование -->
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

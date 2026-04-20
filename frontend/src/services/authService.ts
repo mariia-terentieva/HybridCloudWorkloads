@@ -1,5 +1,16 @@
 import { api } from './api';
-import { LoginRequest, RegisterRequest, AuthResponse } from '../types';
+import { LoginRequest, RegisterRequest, AuthResponse, User } from '../types';
+
+interface UpdateProfileRequest {
+  firstName: string;
+  lastName: string;
+}
+
+interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+}
 
 export const authService = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {

@@ -12,28 +12,20 @@ import {
   Alert,
   IconButton,
   Typography,
-  Tooltip,
   InputAdornment,
   FormControl,
   InputLabel,
   Select,
   Chip,
-  FormHelperText,
   Divider,
-  Paper,
 } from '@mui/material';
 import {
-  Info,
   Add,
   Remove,
-  Terminal,
   ArrowBack,
   Speed,
   BusinessCenter,
-  AttachMoney,
   AccessTime,
-  Warning,
-  CheckCircle,
 } from '@mui/icons-material';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { 
@@ -43,8 +35,6 @@ import {
   UsagePattern,
   CriticalityClass,
   BudgetTier,
-  SlaRequirement,
-  BusinessHours,
   TimeRange,
 } from '../types';
 import { predefinedImages, getImageInfo } from '../utils/dockerImages';
@@ -157,9 +147,7 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
     control,
     handleSubmit,
     reset,
-    watch,
     setValue,
-    getValues,
     formState: { errors },
   } = useForm<WorkloadFormData>({
     defaultValues: {
@@ -212,16 +200,16 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
     name: 'businessHours.peakHours',
   });
 
-  const containerImage = watch('containerImage');
-  const criticality = watch('criticality');
-  const budgetTier = watch('budgetTier');
+  //const containerImage = watch('containerImage');
+  //const criticality = watch('criticality');
+  //const budgetTier = watch('budgetTier');
 
   // Определяем является ли образ custom
-  const isCustomImage = React.useMemo(() => {
+  /*const isCustomImage = React.useMemo(() => {
     if (!containerImage) return false;
     if (inputMode === 'custom') return true;
     return !predefinedImages.some(img => img.value === containerImage);
-  }, [containerImage, inputMode]);
+  }, [containerImage, inputMode]);*/
 
   // Функция для парсинга JSON строки в массив объектов
   const parseEnvironmentVariables = (envJson?: string): EnvironmentVariable[] => {
@@ -238,10 +226,10 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
   };
 
   // Функция для парсинга тегов
-  const parseTags = (tagsString?: string): string[] => {
+  /*const parseTags = (tagsString?: string): string[] => {
     if (!tagsString) return [];
     return tagsString.split(',').map(t => t.trim()).filter(t => t);
-  };
+  };*/
 
   // Загрузка данных при редактировании
   React.useEffect(() => {
@@ -306,7 +294,7 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
   };
 
   // Валидация чисел
-  const allowOnlyDigits = (e: React.KeyboardEvent) => {
+  /*const allowOnlyDigits = (e: React.KeyboardEvent) => {
     if (!/[\d]/.test(e.key) && 
         e.key !== 'Backspace' && 
         e.key !== 'Tab' && 
@@ -315,7 +303,7 @@ export const WorkloadForm: React.FC<WorkloadFormProps> = ({
         e.key !== 'ArrowRight') {
       e.preventDefault();
     }
-  };
+  };*/
 
   const onSubmitForm = (data: WorkloadFormData) => {
     // Преобразуем environmentVars в JSON строку
