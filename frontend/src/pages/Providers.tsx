@@ -12,15 +12,12 @@ import {
   Snackbar,
   CircularProgress,
   Divider,
-  IconButton,
   Tooltip,
 } from '@mui/material';
 import {
   Cloud,
   Refresh,
   CompareArrows,
-  Dashboard,
-  ArrowBack,
   Storage as StorageIcon,
   Home,
 } from '@mui/icons-material';
@@ -30,6 +27,8 @@ import { providerService } from '../services/providerService';
 import { ProviderCard } from '../components/ProviderCard';
 import { PriceComparison } from '../components/PriceComparison';
 import { CloudProvider, SyncStatus } from '../types/providers';
+import { ProviderRegions } from '../components/ProviderRegions';
+import { InstanceTypesList } from '../components/InstanceTypesList';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -231,6 +230,7 @@ export const Providers: React.FC = () => {
         <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
           <Tab label="Провайдеры" />
           <Tab label="Регионы и инстансы" disabled={!selectedProvider} />
+          <Tab label="Типы инстансов" disabled={!selectedProvider} />
           <Tab label="Сравнение цен" />
         </Tabs>
       </Paper>
@@ -265,29 +265,25 @@ export const Providers: React.FC = () => {
               </Typography>
               <Divider />
             </Box>
-            
-            {/* Заглушка для регионов */}
-            <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="h6" gutterBottom color="text.secondary">
-                🚧 Раздел в разработке
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Скоро здесь появится список регионов и типов инстансов для {selectedProvider.displayName}
-              </Typography>
-              <Button
-                variant="outlined"
-                sx={{ mt: 2 }}
-                onClick={handleBackToProviders}
-              >
-                Вернуться к списку провайдеров
-              </Button>
-            </Paper>
+            <ProviderRegions 
+              providerCode={selectedProvider.code}
+              providerName={selectedProvider.displayName}
+            />
           </>
+        )}
+      </TabPanel>
+      {/* Панель типов инстансов */}
+      <TabPanel value={tabValue} index={2}>
+        {selectedProvider && (
+          <InstanceTypesList
+            providerCode={selectedProvider.code}
+            providerName={selectedProvider.displayName}
+          />
         )}
       </TabPanel>
 
       {/* Панель сравнения цен */}
-      <TabPanel value={tabValue} index={2}>
+      <TabPanel value={tabValue} index={3}>
         <PriceComparison />
       </TabPanel>
 

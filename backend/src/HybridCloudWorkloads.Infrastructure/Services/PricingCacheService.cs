@@ -581,6 +581,42 @@ public class PricingCacheService : IPricingCacheService, IDisposable
         return stats;
     }
 
+    /// <summary>
+    /// Получить статистику по провайдеру
+    /// </summary>
+    public async Task<ProviderStats> GetProviderStatsAsync(Guid providerId)
+    {
+        var cacheKey = $"stats:provider:{providerId}";
+
+        if (_memoryCache.TryGetValue(cacheKey, out ProviderStats? cached) && cached != null)
+        {
+            return cached;
+        }
+    
+        var stats = new ProviderStats();
+    
+        var regions = await GetRegionsAsync(providerId);
+        stats.TotalRegions = regions.Count;
+    
+        foreach (var region in regions)
+        {
+            var instanceTypes = await GetInstanceTypesAsync(providerId, region.Id);
+            stats.InstanceTypesByRegion[region.Code] = instanceTypes.Count;
+            stats.TotalInstanceTypes += instanceTypes.Count;
+        }
+    
+        _memoryCache.Set(cacheKey, stats, TimeSpan.FromHours(1));
+    
+        return stats;
+    }
+
+    public class ProviderStats
+    {
+        public int TotalRegions { get; set; }
+        public int TotalInstanceTypes { get; set; }
+        public Dictionary<string, int> InstanceTypesByRegion { get; set; } = new();
+    }
+
     #endregion
 
     #region Private Methods

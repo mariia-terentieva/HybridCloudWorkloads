@@ -7,7 +7,6 @@ using HybridCloudWorkloads.Core.Interfaces;
 using HybridCloudWorkloads.API.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace HybridCloudWorkloads.API.Controllers;
@@ -60,7 +59,9 @@ public class CloudProvidersController : ControllerBase
             SyncEnabled = p.SyncEnabled,
             LastSyncAt = p.LastSyncAt,
             SupportedFeatures = GetSupportedFeatures(p.Code),
-            SyncIntervalMinutes = p.SyncIntervalMinutes, 
+            SyncIntervalMinutes = p.SyncIntervalMinutes,
+            ApiEndpoint = p.ApiEndpoint,
+            AuthType = p.AuthType ?? "unknown",
         }).ToList();
 
         return Ok(result);
@@ -81,6 +82,7 @@ public class CloudProvidersController : ControllerBase
         var regions = await _cacheService.GetRegionsAsync(provider.Id);
         var services = await GetServicesAsync(provider.Id);
         var syncStatus = await _syncService.GetSyncStatusAsync(provider.Id);
+        var stats = await GetProviderStatisticsAsync(provider.Id);
 
         var result = new ProviderDetailDto
         {
@@ -99,6 +101,7 @@ public class CloudProvidersController : ControllerBase
             UpdatedAt = provider.UpdatedAt,
             RegionsCount = regions.Count,
             ServicesCount = services.Count,
+            TotalInstanceTypes = stats.TotalInstanceTypes,
             SyncStatus = new SyncStatusDto
             {
                 IsRunning = syncStatus.IsRunning,
@@ -149,12 +152,13 @@ public class CloudProvidersController : ControllerBase
     #region Regions
 
     /// <summary>
-    /// Получить список регионов провайдера
+    /// Получить список регионов провайдера (расширенная версия)
     /// </summary>
     [HttpGet("{providerCode}/regions")]
-    public async Task<ActionResult<List<RegionDto>>> GetRegions(
+    public async Task<ActionResult<RegionsResponse>> GetRegionsExtended(
         string providerCode, 
-        [FromQuery] bool forceRefresh = false)
+        [FromQuery] bool forceRefresh = false,
+        [FromQuery] string? continent = null)
     {
         var provider = await _cacheService.GetProviderByCodeAsync(providerCode);
         if (provider == null)
@@ -164,28 +168,54 @@ public class CloudProvidersController : ControllerBase
 
         var regions = await _cacheService.GetRegionsAsync(provider.Id, forceRefresh);
         
-        var result = regions.Select(r => new RegionDto
+        // Фильтрация по континенту
+        if (!string.IsNullOrEmpty(continent))
         {
-            Id = r.Id,
-            Code = r.Code,
-            Name = r.Name,
-            DisplayName = r.DisplayName,
-            Continent = r.Continent,
-            Country = r.Country,
-            City = r.City,
-            Status = r.Status.ToString(),
-            AvailabilityZones = r.AvailabilityZones,
-            Compliance = r.Compliance != null ? System.Text.Json.JsonSerializer.Deserialize<string[]>(r.Compliance) : null
-        }).ToList();
+            regions = regions.Where(r => r.Continent == continent).ToList();
+        }
 
-        return Ok(result);
+        // Получаем статистику по инстансам для каждого региона
+        var instanceStats = await GetInstanceTypesStatsByRegionAsync(provider.Id);
+
+        var response = new RegionsResponse
+        {
+            ProviderCode = providerCode,
+            ProviderName = provider.DisplayName,
+            TotalRegions = regions.Count,
+            Continents = regions.Select(r => r.Continent).Distinct().OrderBy(c => c).ToList(),
+            Regions = regions.Select(r => new RegionDetail
+            {
+                Id = r.Id,
+                Code = r.Code,
+                Name = r.Name,
+                DisplayName = r.DisplayName,
+                Continent = r.Continent,
+                Country = r.Country,
+                City = r.City,
+                Coordinates = r.Coordinates,
+                Status = r.Status.ToString(),
+                AvailabilityZones = r.AvailabilityZones,
+                Compliance = r.Compliance != null ? 
+                    System.Text.Json.JsonSerializer.Deserialize<string[]>(r.Compliance) : null,
+                AvailableServices = r.AvailableServices != null ? 
+                    System.Text.Json.JsonSerializer.Deserialize<string[]>(r.AvailableServices) : null,
+                InstanceTypesCount = instanceStats.GetValueOrDefault(r.Id),
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt
+            }).ToList()
+        };
+
+        return Ok(response);
     }
 
     /// <summary>
-    /// Получить детальную информацию о регионе
+    /// Получить детальную информацию о регионе (расширенная версия)
     /// </summary>
     [HttpGet("{providerCode}/regions/{regionCode}")]
-    public async Task<ActionResult<RegionDetailDto>> GetRegion(string providerCode, string regionCode)
+    public async Task<ActionResult<RegionDetailResponse>> GetRegionExtended(
+        string providerCode, 
+        string regionCode,
+        [FromQuery] bool includeInstanceTypes = false)
     {
         var provider = await _cacheService.GetProviderByCodeAsync(providerCode);
         if (provider == null)
@@ -199,22 +229,7 @@ public class CloudProvidersController : ControllerBase
             return NotFound($"Region '{regionCode}' not found");
         }
 
-        var instanceTypes = await _cacheService.GetInstanceTypesAsync(provider.Id, region.Id);
-        
-        // Группировка по категориям для статистики
-        var categoryStats = instanceTypes
-            .GroupBy(t => t.Category)
-            .Select(g => new CategoryStatDto
-            {
-                Category = g.Key,
-                Count = g.Count(),
-                MinVcpu = (int)g.Min(t => t.VcpuCount),
-                MaxVcpu = (int)g.Max(t => t.VcpuCount),
-                MinMemory = g.Min(t => t.MemoryGb),
-                MaxMemory = g.Max(t => t.MemoryGb)
-            }).ToList();
-
-        var result = new RegionDetailDto
+        var response = new RegionDetailResponse
         {
             Id = region.Id,
             Code = region.Code,
@@ -226,14 +241,34 @@ public class CloudProvidersController : ControllerBase
             Coordinates = region.Coordinates,
             Status = region.Status.ToString(),
             AvailabilityZones = region.AvailabilityZones,
-            Compliance = region.Compliance != null ? System.Text.Json.JsonSerializer.Deserialize<string[]>(region.Compliance) : null,
+            Compliance = region.Compliance != null ? 
+                System.Text.Json.JsonSerializer.Deserialize<string[]>(region.Compliance) : null,
+            AvailableServices = region.AvailableServices != null ? 
+                System.Text.Json.JsonSerializer.Deserialize<string[]>(region.AvailableServices) : null,
             CreatedAt = region.CreatedAt,
-            UpdatedAt = region.UpdatedAt,
-            TotalInstanceTypes = instanceTypes.Count,
-            CategoryStats = categoryStats
+            UpdatedAt = region.UpdatedAt
         };
 
-        return Ok(result);
+        if (includeInstanceTypes)
+        {
+            var instanceTypes = await _cacheService.GetInstanceTypesAsync(provider.Id, region.Id);
+            response.InstanceTypes = instanceTypes.Select(t => new InstanceTypeSummary
+            {
+                Id = t.Id,
+                TypeCode = t.TypeCode,
+                DisplayName = t.DisplayName,
+                Category = t.Category,
+                Family = t.Family,
+                VcpuCount = t.VcpuCount,
+                MemoryGb = t.MemoryGb,
+                Availability = t.Availability.ToString()
+            }).ToList();
+            
+            response.InstanceTypesCount = instanceTypes.Count;
+            response.Categories = instanceTypes.Select(t => t.Category).Distinct().OrderBy(c => c).ToList();
+        }
+
+        return Ok(response);
     }
 
     #endregion
@@ -241,7 +276,7 @@ public class CloudProvidersController : ControllerBase
     #region Instance Types
 
     /// <summary>
-    /// Получить типы инстансов для региона
+    /// Получить типы инстансов с расширенной фильтрацией
     /// </summary>
     [HttpGet("{providerCode}/instance-types")]
     public async Task<ActionResult<InstanceTypesResponse>> GetInstanceTypes(
@@ -252,6 +287,9 @@ public class CloudProvidersController : ControllerBase
         [FromQuery] double? minMemory = null,
         [FromQuery] double? maxMemory = null,
         [FromQuery] string? category = null,
+        [FromQuery] string? family = null,
+        [FromQuery] string? cpuArchitecture = null,
+        [FromQuery] bool? hasGpu = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         [FromQuery] bool forceRefresh = false)
@@ -265,6 +303,22 @@ public class CloudProvidersController : ControllerBase
         var instanceTypes = await _cacheService.GetInstanceTypesFilteredAsync(
             provider.Id, regionCode, minCpu, maxCpu, minMemory, maxMemory, category, forceRefresh);
 
+        // Дополнительная фильтрация
+        if (!string.IsNullOrEmpty(family))
+        {
+            instanceTypes = instanceTypes.Where(t => t.Family == family).ToList();
+        }
+        
+        if (!string.IsNullOrEmpty(cpuArchitecture))
+        {
+            instanceTypes = instanceTypes.Where(t => t.CpuArchitecture == cpuArchitecture).ToList();
+        }
+        
+        if (hasGpu.HasValue)
+        {
+            instanceTypes = instanceTypes.Where(t => t.HasGpu == hasGpu.Value).ToList();
+        }
+
         // Пагинация
         var totalCount = instanceTypes.Count;
         var pagedTypes = instanceTypes
@@ -272,7 +326,7 @@ public class CloudProvidersController : ControllerBase
             .Take(pageSize)
             .ToList();
 
-        // Получаем цены для типов инстансов
+        // Получаем цены
         var instanceTypeIds = pagedTypes.Select(t => t.Id).ToList();
         var pricings = await _cacheService.GetBatchPricingAsync(instanceTypeIds);
 
@@ -341,7 +395,6 @@ public class CloudProvidersController : ControllerBase
             return NotFound($"Provider '{providerCode}' not found");
         }
 
-        // Ищем тип инстанса
         var instanceTypes = await _cacheService.GetInstanceTypesFilteredAsync(
             provider.Id, regionCode);
         
@@ -474,7 +527,6 @@ public class CloudProvidersController : ControllerBase
             }
         }
 
-        // Вычисляем сравнение
         if (result.Items.Count >= 2)
         {
             result.Comparison = new ComparisonSummaryDto
@@ -624,11 +676,10 @@ public class CloudProvidersController : ControllerBase
     #region Sync
 
     /// <summary>
-    /// Запустить синхронизацию с провайдером (только для админов)
+    /// Запустить синхронизацию с провайдером
     /// </summary>
     [HttpPost("{providerCode}/sync")]
     [Authorize]
-    //[Authorize(Roles = "Admin")]
     public async Task<ActionResult<SyncResult>> SyncProvider(
         string providerCode, 
         [FromQuery] bool force = false)
@@ -684,11 +735,10 @@ public class CloudProvidersController : ControllerBase
     }
 
     /// <summary>
-    /// Запустить синхронизацию всех провайдеров (только для админов)
+    /// Запустить синхронизацию всех провайдеров
     /// </summary>
     [HttpPost("sync-all")]
     [Authorize]
-    //[Authorize(Roles = "Admin")]
     public async Task<ActionResult<Dictionary<string, SyncResult>>> SyncAllProviders([FromQuery] bool force = false)
     {
         var results = await _syncService.SyncAllProvidersAsync(force);
@@ -704,11 +754,10 @@ public class CloudProvidersController : ControllerBase
     #region Cache
 
     /// <summary>
-    /// Получить статистику кэша (только для админов)
+    /// Получить статистику кэша
     /// </summary>
     [HttpGet("cache/stats")]
     [Authorize]
-    //[Authorize(Roles = "Admin")]
     public async Task<ActionResult<CacheStatistics>> GetCacheStats()
     {
         var stats = await _cacheService.GetCacheStatisticsAsync();
@@ -716,11 +765,10 @@ public class CloudProvidersController : ControllerBase
     }
 
     /// <summary>
-    /// Инвалидировать кэш провайдера (только для админов)
+    /// Инвалидировать кэш провайдера
     /// </summary>
     [HttpPost("{providerCode}/cache/invalidate")]
     [Authorize]
-    //[Authorize(Roles = "Admin")]    
     public async Task<IActionResult> InvalidateCache(string providerCode)
     {
         var provider = await _cacheService.GetProviderByCodeAsync(providerCode);
@@ -734,11 +782,10 @@ public class CloudProvidersController : ControllerBase
     }
 
     /// <summary>
-    /// Инвалидировать весь кэш (только для админов)
+    /// Инвалидировать весь кэш
     /// </summary>
     [HttpPost("cache/invalidate-all")]
     [Authorize]
-    //[Authorize(Roles = "Admin")]    
     public async Task<IActionResult> InvalidateAllCache()
     {
         await _cacheService.InvalidateAllCacheAsync();
@@ -749,12 +796,39 @@ public class CloudProvidersController : ControllerBase
 
     #region Private Helper Methods
 
+    private async Task<ProviderStatistics> GetProviderStatisticsAsync(Guid providerId)
+    {
+        var stats = new ProviderStatistics();
+        
+        var regions = await _cacheService.GetRegionsAsync(providerId);
+        
+        foreach (var region in regions)
+        {
+            var instanceTypes = await _cacheService.GetInstanceTypesAsync(providerId, region.Id);
+            stats.InstanceTypesByRegion[region.Id] = instanceTypes.Count;
+            stats.TotalInstanceTypes += instanceTypes.Count;
+        }
+        
+        return stats;
+    }
+
+    private async Task<Dictionary<Guid, int>> GetInstanceTypesStatsByRegionAsync(Guid providerId)
+    {
+        var stats = new Dictionary<Guid, int>();
+        var regions = await _cacheService.GetRegionsAsync(providerId);
+        
+        foreach (var region in regions)
+        {
+            var instanceTypes = await _cacheService.GetInstanceTypesAsync(providerId, region.Id);
+            stats[region.Id] = instanceTypes.Count;
+        }
+        
+        return stats;
+    }
+
     private async Task<List<CloudService>> GetServicesAsync(Guid providerId)
     {
-        // Используем кэш или прямой запрос
-        var cacheKey = $"services:{providerId}";
-        // Здесь можно добавить кэширование сервисов
-        return new List<CloudService>(); // Заглушка
+        return new List<CloudService>();
     }
 
     private async Task<InstanceTypeDetailDto> GetInstanceTypeDetail(
@@ -797,15 +871,12 @@ public class CloudProvidersController : ControllerBase
     {
         double score = 100;
         
-        // CPU match
         var cpuDiff = Math.Abs(instanceType.VcpuCount - request.Cpu);
         score -= cpuDiff * 10;
         
-        // Memory match
         var memoryDiff = Math.Abs(instanceType.MemoryGb - request.Memory) / request.Memory;
         score -= memoryDiff * 20;
         
-        // Price score
         if (request.MaxBudget.HasValue)
         {
             var monthlyPrice = pricing.OnDemandMonthly;
@@ -820,14 +891,12 @@ public class CloudProvidersController : ControllerBase
             }
         }
         
-        // Category bonus
         if (!string.IsNullOrEmpty(request.PreferredCategory) && 
             instanceType.Category == request.PreferredCategory)
         {
             score += 15;
         }
         
-        // Spot bonus if requested
         if (request.IncludeSpot && pricing.SpotSavingsPercent > 50)
         {
             score += 10;
@@ -861,3 +930,60 @@ public class CloudProvidersController : ControllerBase
 
     #endregion
 }
+
+#region Additional DTOs for 2.5
+
+public class RegionsResponse
+{
+    public string ProviderCode { get; set; } = string.Empty;
+    public string ProviderName { get; set; } = string.Empty;
+    public int TotalRegions { get; set; }
+    public List<string> Continents { get; set; } = new();
+    public List<RegionDetail> Regions { get; set; } = new();
+}
+
+public class RegionDetail
+{
+    public Guid Id { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string Continent { get; set; } = string.Empty;
+    public string? Country { get; set; }
+    public string? City { get; set; }
+    public string? Coordinates { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public int AvailabilityZones { get; set; }
+    public string[]? Compliance { get; set; }
+    public string[]? AvailableServices { get; set; }
+    public int InstanceTypesCount { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class RegionDetailResponse : RegionDetail
+{
+    public List<InstanceTypeSummary> InstanceTypes { get; set; } = new();
+    public int InstanceTypesCount { get; set; }
+    public List<string> Categories { get; set; } = new();
+}
+
+public class InstanceTypeSummary
+{
+    public Guid Id { get; set; }
+    public string TypeCode { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string Family { get; set; } = string.Empty;
+    public double VcpuCount { get; set; }
+    public double MemoryGb { get; set; }
+    public string Availability { get; set; } = string.Empty;
+}
+
+public class ProviderStatistics
+{
+    public int TotalInstanceTypes { get; set; }
+    public Dictionary<Guid, int> InstanceTypesByRegion { get; set; } = new();
+}
+
+#endregion

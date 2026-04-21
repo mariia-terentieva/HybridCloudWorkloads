@@ -17,6 +17,8 @@ public class ProviderDto
     public DateTime? LastSyncAt { get; set; }
     public string[] SupportedFeatures { get; set; } = Array.Empty<string>();
     public int SyncIntervalMinutes { get; set; }
+    public string? ApiEndpoint { get; set; }
+    public string AuthType { get; set; } = string.Empty;
 }
 
 public class ProviderDetailDto : ProviderDto
@@ -28,6 +30,7 @@ public class ProviderDetailDto : ProviderDto
     public DateTime UpdatedAt { get; set; }
     public int RegionsCount { get; set; }
     public int ServicesCount { get; set; }
+    public int TotalInstanceTypes { get; set; }  
     public SyncStatusDto? SyncStatus { get; set; }
 }
 

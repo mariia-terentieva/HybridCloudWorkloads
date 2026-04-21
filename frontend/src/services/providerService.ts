@@ -16,6 +16,13 @@ import {
   InstanceTypesFilter,
   RecommendationsRequest,
   InstanceRecommendation,
+  ProviderDetailResponse,
+  RegionsResponse,
+  RegionDetailResponse,
+  InstanceTypesResponseExtended,
+  InstanceTypeFullDetail,
+  CompareInstanceTypesRequest,
+  InstanceTypesComparison,
 } from '../types/providers';
 
 export const providerService = {
@@ -243,4 +250,81 @@ export const providerService = {
   invalidateAllCache: async (): Promise<void> => {
     await api.post('/providers/cache/invalidate-all');
   },
+
+  // Получить детальную информацию о провайдере
+getProviderDetail: async (providerCode: string): Promise<ProviderDetailResponse> => {
+  const response = await api.get<ProviderDetailResponse>(`/providers/${providerCode}`);
+  return response.data;
+},
+
+// Получить регионы провайдера с расширенной информацией
+getRegionsExtended: async (
+  providerCode: string, 
+  forceRefresh = false,
+  continent?: string
+): Promise<RegionsResponse> => {
+  const params: Record<string, any> = { forceRefresh };
+  if (continent) params.continent = continent;
+  const response = await api.get<RegionsResponse>(`/providers/${providerCode}/regions`, { params });
+  return response.data;
+},
+
+// Получить детальную информацию о регионе
+getRegionDetail: async (
+  providerCode: string, 
+  regionCode: string,
+  includeInstanceTypes = false
+): Promise<RegionDetailResponse> => {
+  const response = await api.get<RegionDetailResponse>(
+    `/providers/${providerCode}/regions/${regionCode}`,
+    { params: { includeInstanceTypes } }
+  );
+  return response.data;
+},
+
+// Получить типы инстансов с расширенной фильтрацией
+getInstanceTypesExtended: async (
+  providerCode: string,
+  filters: {
+    regionCode?: string;
+    minCpu?: number;
+    maxCpu?: number;
+    minMemory?: number;
+    maxMemory?: number;
+    category?: string;
+    family?: string;
+    cpuArchitecture?: string;
+    hasGpu?: boolean;
+    page?: number;
+    pageSize?: number;
+    forceRefresh?: boolean;
+  }
+): Promise<InstanceTypesResponseExtended> => {
+  const params: Record<string, any> = { ...filters };
+  const response = await api.get<InstanceTypesResponseExtended>(
+    `/providers/${providerCode}/instance-types`,
+    { params }
+  );
+  return response.data;
+},
+
+// Получить полную информацию о типе инстанса
+getInstanceTypeFull: async (
+  providerCode: string,
+  typeCode: string,
+  regionCode?: string
+): Promise<InstanceTypeFullDetail> => {
+  const params = regionCode ? { regionCode } : {};
+  const response = await api.get<InstanceTypeFullDetail>(
+    `/providers/${providerCode}/instance-types/${typeCode}`,
+    { params }
+  );
+  return response.data;
+},
+
+// Сравнить типы инстансов
+compareInstanceTypes: async (request: CompareInstanceTypesRequest): Promise<InstanceTypesComparison> => {
+  const response = await api.post<InstanceTypesComparison>('/providers/instance-types/compare', request);
+  return response.data;
+},
 };

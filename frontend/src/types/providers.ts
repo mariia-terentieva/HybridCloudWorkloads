@@ -402,3 +402,292 @@ export const INSTANCE_CATEGORY_COLORS: Record<InstanceCategory, string> = {
   'High Performance Computing': '#EC4899',
   'Burstable': '#6B7280',
 };
+
+// ========== НОВЫЕ ТИПЫ ДЛЯ ДОРАБОТКИ 2.5 ==========
+
+export interface ProviderDetailResponse {
+  id: string;
+  code: string;
+  displayName: string;
+  description?: string;
+  logoUrl?: string;
+  apiEndpoint?: string;
+  authType: string;
+  status: string;
+  syncEnabled: boolean;
+  syncIntervalMinutes: number;
+  lastSyncAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  regionsCount: number;
+  totalInstanceTypes: number;
+  regions: RegionSummary[];
+  syncStatus?: SyncStatusInfo;
+}
+
+export interface RegionSummary {
+  id: string;
+  code: string;
+  name: string;
+  continent: string;
+  status: string;
+  availabilityZones: number;
+  instanceTypesCount: number;
+}
+
+export interface SyncStatusInfo {
+  isRunning: boolean;
+  lastSyncSuccess: boolean;
+  lastSyncError?: string;
+  nextSyncAt?: string;
+}
+
+export interface RegionsResponse {
+  providerCode: string;
+  providerName: string;
+  totalRegions: number;
+  continents: string[];
+  regions: RegionDetail[];
+}
+
+export interface RegionDetail {
+  id: string;
+  code: string;
+  name: string;
+  displayName: string;
+  continent: string;
+  country?: string;
+  city?: string;
+  coordinates?: string;
+  status: string;
+  availabilityZones: number;
+  compliance?: string[];
+  availableServices?: string[];
+  instanceTypesCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RegionDetailResponse extends RegionDetail {
+  instanceTypes: InstanceTypeSummary[];
+  instanceTypesCount: number;
+  categories: string[];
+}
+
+export interface InstanceTypeSummary {
+  id: string;
+  typeCode: string;
+  displayName: string;
+  category: string;
+  family: string;
+  vcpuCount: number;
+  memoryGb: number;
+  availability: string;
+}
+
+export interface InstanceTypesResponseExtended {
+  providerCode: string;
+  providerName: string;
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  items: InstanceTypeDetail[];
+  availableFilters: FilterOptions;
+  categoryStatistics: CategoryStatistics[];
+}
+
+export interface InstanceTypeDetail {
+  id: string;
+  typeCode: string;
+  displayName: string;
+  description?: string;
+  category: string;
+  family: string;
+  generation: number;
+  vcpuCount: number;
+  cpuArchitecture: string;
+  cpuModel?: string;
+  cpuClockSpeedGhz?: number;
+  memoryGb: number;
+  networkBandwidthGbps: number;
+  networkPerformance?: string;
+  storageType: string;
+  localStorageGb?: number;
+  hasGpu: boolean;
+  gpuModel?: string;
+  gpuCount?: number;
+  availability: string;
+  regionCode?: string;
+  regionName?: string;
+  pricing?: PricingInfo;
+}
+
+export interface PricingInfo {
+  currency: string;
+  onDemandHourly: number;
+  onDemandMonthly: number;
+  spotCurrentPrice?: number;
+  spotSavingsPercent?: number;
+  reserved1YearHourly?: number;
+  reserved3YearHourly?: number;
+}
+
+export interface FilterOptions {
+  categories: string[];
+  families: string[];
+  regions: string[];
+  cpuArchitectures: string[];
+  cpuRange: RangeInfo;
+  memoryRange: RangeInfo;
+  hasGpuAvailable: boolean;
+}
+
+export interface RangeInfo {
+  min: number;
+  max: number;
+}
+
+export interface CategoryStatistics {
+  category: string;
+  count: number;
+  minVcpu: number;
+  maxVcpu: number;
+  minMemory: number;
+  maxMemory: number;
+  avgPrice: number;
+}
+
+export interface InstanceTypeFullDetail {
+  id: string;
+  typeCode: string;
+  displayName: string;
+  description?: string;
+  category: string;
+  family: string;
+  generation: number;
+  vcpuCount: number;
+  cpuArchitecture: string;
+  cpuModel?: string;
+  cpuClockSpeedGhz?: number;
+  cpuType: string;
+  physicalProcessor?: string;
+  memoryGb: number;
+  networkBandwidthGbps: number;
+  networkPerformance?: string;
+  enhancedNetworking: boolean;
+  storageType: string;
+  localStorageGb?: number;
+  localStorageDisks?: number;
+  ebsOptimized: boolean;
+  maxEbsBandwidthMbps?: number;
+  maxIops?: number;
+  hasGpu: boolean;
+  gpuModel?: string;
+  gpuCount?: number;
+  gpuMemoryGb?: number;
+  hasFpga: boolean;
+  virtualizationType: string;
+  placementGroupSupported: boolean;
+  dedicatedHostSupported: boolean;
+  availability: string;
+  region?: RegionInfo;
+  pricing?: FullPricingInfo;
+  similarTypes: SimilarInstanceType[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RegionInfo {
+  code: string;
+  name: string;
+  continent: string;
+  availabilityZones: number;
+}
+
+export interface FullPricingInfo {
+  currency: string;
+  onDemand: OnDemandPricing;
+  spot?: SpotPricing;
+  reserved: ReservedPricing;
+  additionalCosts: AdditionalCosts;
+}
+
+export interface OnDemandPricing {
+  hourly: number;
+  monthly: number;
+}
+
+export interface SpotPricing {
+  currentPrice: number;
+  averagePrice?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  savingsPercent?: number;
+  interruptionRate?: number;
+}
+
+export interface ReservedPricing {
+  oneYear?: ReservedOption;
+  threeYear?: ReservedOption;
+}
+
+export interface ReservedOption {
+  upfront: number;
+  hourlyEquivalent: number;
+  savingsPercent?: number;
+}
+
+export interface AdditionalCosts {
+  storageGbMonthly?: number;
+  dataTransferOutGb?: number;
+  dataTransferInGb?: number;
+}
+
+export interface SimilarInstanceType {
+  typeCode: string;
+  displayName: string;
+  vcpuCount: number;
+  memoryGb: number;
+  category: string;
+}
+
+export interface CompareInstanceTypesRequest {
+  items: CompareItem[];
+}
+
+export interface CompareItem {
+  providerCode: string;
+  typeCode: string;
+  regionCode?: string;
+}
+
+export interface InstanceTypesComparison {
+  items: InstanceTypeComparisonItem[];
+  comparison?: ComparisonSummary;
+}
+
+export interface InstanceTypeComparisonItem {
+  providerCode: string;
+  providerName: string;
+  regionCode: string;
+  regionName: string;
+  typeCode: string;
+  displayName: string;
+  category: string;
+  vcpuCount: number;
+  memoryGb: number;
+  networkBandwidthGbps: number;
+  hasGpu: boolean;
+  onDemandHourly: number;
+  onDemandMonthly: number;
+  currency: string;
+}
+
+export interface ComparisonSummary {
+  bestValue?: string;
+  bestPerformance?: string;
+  bestMemory?: string;
+  bestNetwork?: string;
+  priceRange: RangeInfo;
+}

@@ -141,7 +141,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
             <Chip
               size="small"
               icon={<Storage sx={{ fontSize: 14 }} />}
-              label={provider.authType}
+              label={provider.authType || 'не указан'}
               variant="outlined"
             />
           </Tooltip>
