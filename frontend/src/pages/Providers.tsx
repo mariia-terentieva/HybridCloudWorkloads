@@ -199,14 +199,6 @@ export const Providers: React.FC = () => {
             </Tooltip>
             
             <Button
-              variant="outlined"
-              startIcon={<CompareArrows />}
-              onClick={() => setTabValue(2)}
-            >
-              Сравнение цен
-            </Button>
-            
-            <Button
               variant="contained"
               startIcon={<Refresh />}
               onClick={handleSyncAll}

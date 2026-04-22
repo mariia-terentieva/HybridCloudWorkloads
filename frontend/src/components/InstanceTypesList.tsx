@@ -43,9 +43,20 @@ export const InstanceTypesList: React.FC<InstanceTypesListProps> = ({
   regionCode,
 }) => {
   const [instanceTypes, setInstanceTypes] = useState<InstanceTypeDetail[]>([]);
-  const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
+  const [filterOptions, setFilterOptions] = useState<FilterOptions | null>({
+    categories: [],
+    families: [],
+    regions: [],
+    cpuArchitectures: [],
+    cpuRange: { min: 0, max: 128 },
+    memoryRange: { min: 0, max: 512 },
+    hasGpuAvailable: false,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [absoluteCpuRange, setAbsoluteCpuRange] = useState<{ min: number; max: number }>({ min: 0, max: 128 });
+  const [absoluteMemoryRange, setAbsoluteMemoryRange] = useState<{ min: number; max: number }>({ min: 0, max: 512 });
+  const [shouldReset, setShouldReset] = useState(false);
   
   // Фильтры
   const [showFilters, setShowFilters] = useState(false);
@@ -62,62 +73,102 @@ export const InstanceTypesList: React.FC<InstanceTypesListProps> = ({
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  useEffect(() => {
-    loadInstanceTypes();
-  }, [providerCode, regionCode, page, selectedCategory, selectedFamily, hasGpu, selectedCpuArch]);
+useEffect(() => {
+  loadInstanceTypes(true); // Первая загрузка
+}, [providerCode, regionCode]);
 
-  useEffect(() => {
-    if (filterOptions) {
-      setCpuRange([filterOptions.cpuRange.min, filterOptions.cpuRange.max]);
-      setMemoryRange([filterOptions.memoryRange.min, filterOptions.memoryRange.max]);
-    }
-  }, [filterOptions]);
+useEffect(() => {
+  if (page > 1) {
+    loadInstanceTypes(false); // Пагинация - не первая загрузка
+  }
+}, [page]);
 
-  const loadInstanceTypes = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await providerService.getInstanceTypesExtended(providerCode, {
-        regionCode,
-        category: selectedCategory || undefined,
-        family: selectedFamily || undefined,
-        minCpu: cpuRange[0],
-        maxCpu: cpuRange[1],
-        minMemory: memoryRange[0],
-        maxMemory: memoryRange[1],
-        hasGpu: hasGpu ?? undefined,
-        cpuArchitecture: selectedCpuArch || undefined,
-        page,
-        pageSize,
+useEffect(() => {
+  if (shouldReset) {
+    loadInstanceTypes(false);
+    setShouldReset(false);
+  }
+}, [shouldReset, selectedCategory, selectedFamily, cpuRange, memoryRange, hasGpu, selectedCpuArch, page]);
+
+const loadInstanceTypes = async (isInitialLoad: boolean = false) => {
+  setIsLoading(true);
+  setError(null);
+  try {
+    const response = await providerService.getInstanceTypesExtended(providerCode, {
+      regionCode,
+      category: selectedCategory || undefined,
+      family: selectedFamily || undefined,
+      minCpu: cpuRange[0],
+      maxCpu: cpuRange[1],
+      minMemory: memoryRange[0],
+      maxMemory: memoryRange[1],
+      hasGpu: hasGpu ?? undefined,
+      cpuArchitecture: selectedCpuArch || undefined,
+      page,
+      pageSize,
+    });
+    
+    setInstanceTypes(response.items);
+    setTotalCount(response.totalCount);
+    setTotalPages(response.totalPages);
+    
+    // При первой загрузке устанавливаем абсолютные границы
+    if (isInitialLoad && response.availableFilters) {
+      setAbsoluteCpuRange({
+        min: response.availableFilters.cpuRange.min,
+        max: response.availableFilters.cpuRange.max,
+      });
+      setAbsoluteMemoryRange({
+        min: response.availableFilters.memoryRange.min,
+        max: response.availableFilters.memoryRange.max,
       });
       
-      setInstanceTypes(response.items);
-      setTotalCount(response.totalCount);
-      setTotalPages(response.totalPages);
-      setFilterOptions(response.availableFilters);
-    } catch (err: any) {
-      setError(err.message || 'Ошибка загрузки типов инстансов');
-    } finally {
-      setIsLoading(false);
+      // Устанавливаем начальные значения слайдеров
+      setCpuRange([
+        response.availableFilters.cpuRange.min,
+        response.availableFilters.cpuRange.max,
+      ]);
+      setMemoryRange([
+        response.availableFilters.memoryRange.min,
+        response.availableFilters.memoryRange.max,
+      ]);
     }
-  };
-
-  const handleApplyFilters = () => {
-    setPage(1);
-    loadInstanceTypes();
-  };
-
-  const handleResetFilters = () => {
-    setSelectedCategory('');
-    setSelectedFamily('');
-    setHasGpu(null);
-    setSelectedCpuArch('');
-    if (filterOptions) {
-      setCpuRange([filterOptions.cpuRange.min, filterOptions.cpuRange.max]);
-      setMemoryRange([filterOptions.memoryRange.min, filterOptions.memoryRange.max]);
+    
+    // Обновляем только опции фильтров (категории, семейства и т.д.)
+    // НЕ трогаем границы слайдеров
+    if (response.availableFilters) {
+      setFilterOptions({
+        categories: response.availableFilters.categories,
+        families: response.availableFilters.families,
+        regions: response.availableFilters.regions,
+        cpuArchitectures: response.availableFilters.cpuArchitectures,
+        cpuRange: response.availableFilters.cpuRange, // Сохраняем текущие границы с сервера
+        memoryRange: response.availableFilters.memoryRange,
+        hasGpuAvailable: response.availableFilters.hasGpuAvailable,
+      });
     }
-    setPage(1);
-  };
+  } catch (err: any) {
+    setError(err.message || 'Ошибка загрузки типов инстансов');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+const handleApplyFilters = () => {
+  setPage(1);
+  loadInstanceTypes(false);
+};
+
+const handleResetFilters = () => {
+  setSelectedCategory('');
+  setSelectedFamily('');
+  setHasGpu(null);
+  setSelectedCpuArch('');
+  setCpuRange([absoluteCpuRange.min, absoluteCpuRange.max]);
+  setMemoryRange([absoluteMemoryRange.min, absoluteMemoryRange.max]);
+  setPage(1);
+  setShouldReset(true); // Устанавливаем флаг после обновления всех состояний
+};
 
   const formatPrice = (price: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('ru-RU', {
@@ -163,111 +214,117 @@ export const InstanceTypesList: React.FC<InstanceTypesListProps> = ({
             <Button
               variant="outlined"
               startIcon={<Refresh />}
-              onClick={loadInstanceTypes}
+              onClick={() => loadInstanceTypes(false)}
             >
               Обновить
             </Button>
           </Box>
         </Box>
         
-        {/* Панель фильтров */}
-        {showFilters && (
-          <Grid container spacing={3} sx={{ mt: 2 }}>
-            <Grid item xs={12} md={4}>
-              <TextField
-                select
-                fullWidth
-                label="Категория"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                size="small"
-              >
-                <MenuItem value="">Все</MenuItem>
-                {filterOptions?.categories.map(cat => (
-                  <MenuItem key={cat} value={cat}>{cat}</MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                select
-                fullWidth
-                label="Семейство"
-                value={selectedFamily}
-                onChange={(e) => setSelectedFamily(e.target.value)}
-                size="small"
-              >
-                <MenuItem value="">Все</MenuItem>
-                {filterOptions?.families.map(fam => (
-                  <MenuItem key={fam} value={fam}>{fam}</MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                select
-                fullWidth
-                label="Архитектура CPU"
-                value={selectedCpuArch}
-                onChange={(e) => setSelectedCpuArch(e.target.value)}
-                size="small"
-              >
-                <MenuItem value="">Все</MenuItem>
-                {filterOptions?.cpuArchitectures.map(arch => (
-                  <MenuItem key={arch} value={arch}>{arch}</MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Typography variant="caption" gutterBottom>
-                CPU (ядер): {cpuRange[0]} - {cpuRange[1]}
-              </Typography>
-              <Slider
-                value={cpuRange}
-                onChange={(_, val) => setCpuRange(val as [number, number])}
-                valueLabelDisplay="auto"
-                min={filterOptions?.cpuRange.min || 0}
-                max={filterOptions?.cpuRange.max || 128}
-                step={1}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Typography variant="caption" gutterBottom>
-                Память (ГБ): {memoryRange[0]} - {memoryRange[1]}
-              </Typography>
-              <Slider
-                value={memoryRange}
-                onChange={(_, val) => setMemoryRange(val as [number, number])}
-                valueLabelDisplay="auto"
-                min={filterOptions?.memoryRange.min || 0}
-                max={filterOptions?.memoryRange.max || 512}
-                step={0.5}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={hasGpu === true}
-                    onChange={(e) => setHasGpu(e.target.checked ? true : null)}
-                    disabled={!filterOptions?.hasGpuAvailable}
-                  />
-                }
-                label="Только с GPU"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Box display="flex" gap={2}>
-                <Button variant="contained" onClick={handleApplyFilters}>
-                  Применить
-                </Button>
-                <Button variant="outlined" onClick={handleResetFilters}>
-                  Сбросить
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
-        )}
+{/* Панель фильтров */}
+{showFilters && (
+  <Grid container spacing={3} sx={{ mt: 2 }}>
+    <Grid item xs={12} md={4}>
+      <TextField
+        select
+        fullWidth
+        label="Категория"
+        value={selectedCategory}
+        onChange={(e) => setSelectedCategory(e.target.value)}
+        size="small"
+      >
+        <MenuItem value="">Все</MenuItem>
+        {filterOptions?.categories?.map(cat => (
+          <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+        ))}
+      </TextField>
+    </Grid>
+    
+    <Grid item xs={12} md={4}>
+      <TextField
+        select
+        fullWidth
+        label="Семейство"
+        value={selectedFamily}
+        onChange={(e) => setSelectedFamily(e.target.value)}
+        size="small"
+      >
+        <MenuItem value="">Все</MenuItem>
+        {filterOptions?.families?.map(fam => (
+          <MenuItem key={fam} value={fam}>{fam}</MenuItem>
+        ))}
+      </TextField>
+    </Grid>
+    
+    <Grid item xs={12} md={4}>
+      <TextField
+        select
+        fullWidth
+        label="Архитектура CPU"
+        value={selectedCpuArch}
+        onChange={(e) => setSelectedCpuArch(e.target.value)}
+        size="small"
+      >
+        <MenuItem value="">Все</MenuItem>
+        {filterOptions?.cpuArchitectures?.map(arch => (
+          <MenuItem key={arch} value={arch}>{arch}</MenuItem>
+        ))}
+      </TextField>
+    </Grid>
+    
+<Grid item xs={12} md={6}>
+  <Typography variant="caption" gutterBottom>
+    CPU (ядер): {cpuRange[0]} - {cpuRange[1]}
+  </Typography>
+  <Slider
+    value={cpuRange}
+    onChange={(_, val) => setCpuRange(val as [number, number])}
+    valueLabelDisplay="auto"
+    min={absoluteCpuRange.min}  // Используем абсолютные границы
+    max={absoluteCpuRange.max}  // Используем абсолютные границы
+    step={1}
+  />
+</Grid>
+
+<Grid item xs={12} md={6}>
+  <Typography variant="caption" gutterBottom>
+    Память (ГБ): {memoryRange[0]} - {memoryRange[1]}
+  </Typography>
+  <Slider
+    value={memoryRange}
+    onChange={(_, val) => setMemoryRange(val as [number, number])}
+    valueLabelDisplay="auto"
+    min={absoluteMemoryRange.min}  // Используем абсолютные границы
+    max={absoluteMemoryRange.max}  // Используем абсолютные границы
+    step={0.5}
+  />
+</Grid>
+    
+    <Grid item xs={12}>
+      <FormControlLabel
+        control={
+          <Switch
+            checked={hasGpu === true}
+            onChange={(e) => setHasGpu(e.target.checked ? true : null)}
+            disabled={!filterOptions?.hasGpuAvailable}
+          />
+        }
+        label="Только с GPU"
+      />
+    </Grid>
+    
+    <Grid item xs={12}>
+      <Box display="flex" gap={2}>
+        <Button variant="contained" onClick={handleApplyFilters}>
+          Применить
+        </Button>
+        <Button variant="outlined" onClick={handleResetFilters}>
+          Сбросить
+        </Button>
+      </Box>
+    </Grid>
+  </Grid>
+)}
       </Paper>
 
       {/* Таблица инстансов */}
